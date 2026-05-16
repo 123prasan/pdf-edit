@@ -66,6 +66,8 @@ type Props = {
   activeFont?: string | null
   setActiveColor?: (c: string) => void
   setActiveFont?: (f: string) => void
+  docFonts?: string[]
+  docColors?: string[]
 }
 
 export default function TextEditLayer({
@@ -85,6 +87,8 @@ export default function TextEditLayer({
   activeFont,
   setActiveColor,
   setActiveFont,
+  docFonts = [],
+  docColors = [],
 }: Props) {
   const hitLayerRef = useRef<HTMLDivElement | null>(null)
   const textItemsRef = useRef<any[]>([])
@@ -151,13 +155,20 @@ export default function TextEditLayer({
 
           const scaleX = canvasWidth / item.pageWidth
           const scaleY = canvasHeight / item.pageHeight
-          const x = item.x * scaleX
-          const y = item.y * scaleY
-          const w = item.width * scaleX
-          const h = item.height * scaleY
+          let x = item.x * scaleX
+          let y = item.y * scaleY
+          let w = item.width * scaleX
+          let h = item.height * scaleY
           const exactFontSize = item.fontSize * scaleY
 
-          const isEdited = textEdits.some(e => e.page === page && e.itemIndex === i && e.newText !== item.str)
+          const editRecord = textEdits.find(e => e.page === page && e.itemIndex === i)
+          if (editRecord && editRecord.bounds) {
+            x = editRecord.bounds.x
+            y = editRecord.bounds.y
+            w = editRecord.bounds.w
+            h = editRecord.bounds.h
+          }
+          const isEditedText = editRecord && editRecord.newText !== item.str
 
           span.textContent = item.str
           span.style.cssText = `
@@ -165,14 +176,19 @@ export default function TextEditLayer({
             width: ${w}px; height: ${h}px;
             font-size: ${exactFontSize}px; 
             color: ${item.color || '#000000'}; 
-            cursor: text;
+            cursor: ${active ? 'move' : 'text'};
             font-family: ${item.fontFamily || 'sans-serif'};
             font-weight: ${item.fontWeight || 'normal'};
             font-style: ${item.fontStyle || 'normal'};
             line-height: 1;
             white-space: pre;
-            visibility: ${isEdited ? 'hidden' : 'visible'};
+            visibility: ${isEditedText ? 'hidden' : 'visible'};
+            pointer-events: ${active ? 'auto' : 'none'};
+            user-select: none;
           `
+          if (active) {
+            span.title = 'Double click to edit, drag to move'
+          }
           container.appendChild(span)
         })
 
@@ -185,7 +201,7 @@ export default function TextEditLayer({
 
     doRender()
     return () => { cancelled = true }
-  }, [pdfPage, viewport, page, extractedItems])
+  }, [pdfPage, viewport, page, extractedItems, active, textEdits])
 
   // Canvas erasure no longer needed! We are using purely HTML text over an intercepted canvas.
 
@@ -204,18 +220,116 @@ export default function TextEditLayer({
     }
   }, [editingItem])
 
-  // ---- Click on hit target to start editing ----
-  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+
+  const dragRef = useRef<{
+    idx: number
+    startX: number
+    startY: number
+    spanLeft: number
+    spanTop: number
+    span: HTMLElement
+    moved: boolean
+    isEditedDiv: boolean
+  } | null>(null)
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!active || editingItem) return
+    const target = e.target as HTMLElement
+    const isEditedDiv = target.dataset.editedId !== undefined
+    const itemIndexStr = isEditedDiv ? target.dataset.itemIndex : target.closest('[data-item-index]')?.getAttribute('data-item-index')
+    if (!itemIndexStr) return
+
+    const idx = parseInt(itemIndexStr, 10)
+    if (idx < 0) return
+
+    const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
+    if (!span) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const left = parseFloat(span.style.left || '0')
+    const top = parseFloat(span.style.top || '0')
+
+    dragRef.current = {
+      idx,
+      startX: e.clientX,
+      startY: e.clientY,
+      spanLeft: left,
+      spanTop: top,
+      span,
+      moved: false,
+      isEditedDiv
+    }
+    span.setPointerCapture(e.pointerId)
+  }, [active, editingItem])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current
+    if (!d || !active) return
+
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      d.moved = true
+      d.span.style.left = `${d.spanLeft + dx}px`
+      d.span.style.top = `${d.spanTop + dy}px`
+    }
+  }, [active])
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current
+    if (!d) return
+    dragRef.current = null
+    d.span.releasePointerCapture(e.pointerId)
+
+    if (d.moved) {
+      const rawItem = textItemsRef.current[d.idx]
+      const existingEdit = textEdits.find(te => te.page === page && te.itemIndex === d.idx)
+
+      const containerRect = hitLayerRef.current?.parentElement?.getBoundingClientRect()
+      const spanRect = d.span.getBoundingClientRect()
+      if (!containerRect || !rawItem) return
+
+      const newBounds = {
+        x: spanRect.left - containerRect.left,
+        y: spanRect.top - containerRect.top,
+        w: spanRect.width,
+        h: spanRect.height,
+      }
+
+      onTextEdit({
+        id: existingEdit?.id || `te_${page}_${d.idx}`,
+        page,
+        itemIndex: d.idx,
+        originalText: rawItem.str,
+        newText: existingEdit?.newText ?? rawItem.str,
+        fontSize: existingEdit?.fontSize || rawItem.fontSize,
+        fontFamily: existingEdit?.fontFamily || getWebFontMetrics(rawItem?.fontName).fontFamily,
+        fontWeight: existingEdit?.fontWeight || (rawItem.fontWeight === 'bold' ? 'bold' : getWebFontMetrics(rawItem?.fontName).fontWeight),
+        fontStyle: existingEdit?.fontStyle || (rawItem.fontStyle === 'italic' ? 'italic' : getWebFontMetrics(rawItem?.fontName).fontStyle),
+        color: existingEdit?.color || rawItem.color || '#000000',
+        bounds: newBounds,
+        transform: existingEdit?.transform,
+        letterSpacing: existingEdit?.letterSpacing,
+        pageHeight: existingEdit?.pageHeight || rawItem.pageHeight,
+      })
+    }
+  }, [onTextEdit, page, textEdits])
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!active) return
 
     const target = e.target as HTMLElement
-    const span = target.closest<HTMLSpanElement>('[data-item-index]')
-    if (!span) return
+    const isEditedDiv = target.dataset.editedId !== undefined
+    const itemIndexStr = isEditedDiv ? target.dataset.itemIndex : target.closest('[data-item-index]')?.getAttribute('data-item-index')
+    if (!itemIndexStr) return
 
     e.stopPropagation()
     e.preventDefault()
 
-    const idx = parseInt(span.dataset.itemIndex || '-1', 10)
+    const idx = parseInt(itemIndexStr, 10)
     if (idx < 0) return
 
     const rawItem = textItemsRef.current[idx]
@@ -223,7 +337,9 @@ export default function TextEditLayer({
 
     const existingEdit = textEdits.find(te => te.page === page && te.itemIndex === idx)
 
-    const containerRect = hitLayerRef.current?.getBoundingClientRect()
+    const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
+    if (!span) return
+    const containerRect = hitLayerRef.current?.parentElement?.getBoundingClientRect()
     const spanRect = span.getBoundingClientRect()
     if (!containerRect) return
 
@@ -234,20 +350,14 @@ export default function TextEditLayer({
       h: spanRect.height,
     }
 
-    // Hide the native HTML span so the editor div can take its place seamlessly
-    span.style.visibility = 'hidden'
+    if (!isEditedDiv) {
+      span.style.visibility = 'hidden'
+    }
 
-    // We use the exact PyMuPDF backend data directly!
     const exactColor = rawItem.color || '#000000'
     const { fontFamily, fontWeight: parsedWeight, fontStyle: parsedStyle } = getWebFontMetrics(rawItem?.fontName)
-
-    // Fallback to name-parsing if PyMuPDF flags failed to capture bold/italic
     const fontWeight = rawItem.fontWeight === 'bold' ? 'bold' : parsedWeight
     const fontStyle = rawItem.fontStyle === 'italic' ? 'italic' : parsedStyle
-
-    // GUARANTEE NO ENLARGING: Deriving the font size strictly from the visual CSS 
-    // bounding box height of the invisible click target, and scaling it to user space.
-    // The * 0.85 converts bounding-box height to font-size.
     const rawFontSize = rawItem.fontSize
     const pageHeight = rawItem.pageHeight
 
@@ -259,25 +369,35 @@ export default function TextEditLayer({
       text: existingEdit?.newText ?? rawItem.str,
       originalText: existingEdit?.originalText ?? rawItem.str,
       bounds,
-      fontSize: rawFontSize,
-      fontFamily,
-      fontWeight,
-      fontStyle,
-      color: exactColor,
-      transform: undefined,
-      letterSpacing: undefined,
-      pageHeight,
+      fontSize: existingEdit?.fontSize || rawFontSize,
+      fontFamily: existingEdit?.fontFamily || fontFamily,
+      fontWeight: existingEdit?.fontWeight || fontWeight,
+      fontStyle: existingEdit?.fontStyle || fontStyle,
+      color: existingEdit?.color || exactColor,
+      transform: existingEdit?.transform,
+      letterSpacing: existingEdit?.letterSpacing,
+      pageHeight: existingEdit?.pageHeight || pageHeight,
     })
-  }, [active, page, textEdits, canvasRef, scale])
+  }, [active, page, textEdits, setActiveColor, setActiveFont])
+
 
   // ---- Commit edit ----
   const commitEdit = useCallback(() => {
     if (!editingItem) return
 
+    const rawItem = textItemsRef.current[editingItem.idx]
     const currentText = editorRef.current?.textContent ?? editingItem.text
     const existing = textEdits.find(e => e.page === page && e.itemIndex === editingItem.idx)
 
-    if (currentText !== editingItem.originalText) {
+    const textChanged = currentText !== editingItem.originalText
+    const styleChanged =
+      editingItem.color !== (existing?.color ?? rawItem?.color) ||
+      editingItem.fontWeight !== (existing?.fontWeight ?? rawItem?.fontWeight) ||
+      editingItem.fontStyle !== (existing?.fontStyle ?? rawItem?.fontStyle) ||
+      editingItem.fontFamily !== (existing?.fontFamily ?? rawItem?.fontFamily) ||
+      editingItem.fontSize !== (existing?.fontSize ?? rawItem?.fontSize)
+
+    if (textChanged || styleChanged || existing) {
       onTextEdit({
         id: existing?.id ?? `textedit-${page}-${editingItem.idx}-${Date.now()}`,
         page,
@@ -295,7 +415,7 @@ export default function TextEditLayer({
         pageHeight: editingItem.pageHeight,
       })
     } else {
-      // Revert visibility if they didn't change the text
+      // Revert visibility if they didn't change the text or styles
       const span = hitLayerRef.current?.querySelector(`[data-item-index="${editingItem.idx}"]`) as HTMLSpanElement
       if (span) span.style.visibility = 'visible'
     }
@@ -323,15 +443,25 @@ export default function TextEditLayer({
   }, [commitEdit, cancelEdit])
 
   return (
-    <>
+    <div
+      className="text-edit-container"
+      style={{
+        position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight,
+        zIndex: active ? 15 : 3, pointerEvents: active ? 'auto' : 'none'
+      }}
+      onDoubleClick={handleDoubleClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
       {/* Invisible hit targets */}
       <div
         ref={hitLayerRef}
         className="textLayer"
-        onClick={handleClick}
         style={{
-          position: 'absolute', left: 0, top: 0, width: canvasWidth, height: canvasHeight,
-          pointerEvents: active ? 'auto' : 'none', zIndex: active ? 15 : 3,
+          position: 'absolute', left: 0, top: 0, width: '100%', height: '100%',
+          pointerEvents: 'none',
           '--scale-factor': viewport?.scale || scale,
         } as React.CSSProperties}
       />
@@ -339,37 +469,148 @@ export default function TextEditLayer({
       {/* Floating Editable Div */}
       {editingItem && (
         <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onKeyDown={handleEditorKeyDown}
-          onBlur={commitEdit}
-          style={{
-            position: 'absolute',
-            left: editingItem.bounds.x,
-            top: editingItem.bounds.y,
-            minWidth: editingItem.bounds.w,
-            fontSize: editingItem.fontSize * (canvasHeight / editingItem.pageHeight), // EXACT SCALE Y
-            fontFamily: editingItem.fontFamily,
-            fontWeight: editingItem.fontWeight,
-            fontStyle: editingItem.fontStyle,
-            color: editingItem.color,
-            transform: editingItem.transform,
-            transformOrigin: 'top left',
-            letterSpacing: editingItem.letterSpacing,
-            background: 'transparent',
-            outline: '1px dashed #6366f1',
-            outlineOffset: '2px',
-            padding: 0,
-            margin: 0,
-            border: 'none',
-            whiteSpace: 'nowrap',
-            lineHeight: 1,
-            zIndex: 200,
-            cursor: 'text',
+          onBlur={(e) => {
+            // Only commit if the focus has moved OUTSIDE of this entire wrapper (toolbar + editor)
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              commitEdit()
+            }
           }}
         >
-          {editingItem.text}
+          {/* Floating Text Options Toolbar */}
+          <div
+            className="text-edit-toolbar"
+            style={{
+              position: 'absolute',
+              left: editingItem.bounds.x,
+              top: editingItem.bounds.y - 50, // Hover above with space
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'var(--bg-surface)',
+              backdropFilter: 'blur(16px)',
+              padding: '6px 8px',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--border-default)',
+              zIndex: 201,
+              animation: 'popIn 0.3s var(--ease-spring)',
+            }}
+          >
+            <select
+              style={{
+                padding: '4px 6px', fontSize: 13, border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-sm)', maxWidth: 120, background: 'var(--bg-tertiary)',
+                color: 'var(--text-primary)', outline: 'none'
+              }}
+              value={editingItem.fontFamily.split(',')[0].replace(/['"]/g, '').trim()}
+              onChange={(e) => setEditingItem({ ...editingItem, fontFamily: `"${e.target.value}", sans-serif` })}
+            >
+              <option value="">Default Font</option>
+              <optgroup label="Document Fonts">
+                {docFonts.map(f => <option key={f} value={f}>{f}</option>)}
+              </optgroup>
+              <optgroup label="All Fonts">
+                {Array.from(new Set([
+                  'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
+                  'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald',
+                  'Source Sans Pro', 'Raleway', 'PT Sans', 'Merriweather',
+                  'Noto Sans', 'Nunito', 'Playfair Display', 'Lora'
+                ])).map(f => <option key={f} value={f}>{f}</option>)}
+              </optgroup>
+            </select>
+
+            <input
+              type="number"
+              style={{
+                width: 46, padding: '4px 2px', fontSize: 13, border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
+                outline: 'none', textAlign: 'center'
+              }}
+              value={Math.round(editingItem.fontSize)}
+              onChange={(e) => setEditingItem({ ...editingItem, fontSize: Number(e.target.value) || 12 })}
+              title="Font Size"
+            />
+
+            <input
+              type="color"
+              style={{ width: 24, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              value={editingItem.color}
+              onChange={(e) => setEditingItem({ ...editingItem, color: e.target.value })}
+              title="Text Color"
+            />
+
+            <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
+
+            <button
+              style={{
+                width: 32, height: 32, border: 'none', background: editingItem.fontWeight === 'bold' ? 'var(--bg-hover)' : 'transparent',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 'bold', fontSize: 14, color: 'var(--text-primary)'
+              }}
+              onClick={() => setEditingItem({ ...editingItem, fontWeight: editingItem.fontWeight === 'bold' ? 'normal' : 'bold' })}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              style={{
+                width: 32, height: 32, border: 'none', background: editingItem.fontStyle === 'italic' ? 'var(--bg-hover)' : 'transparent',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontStyle: 'italic', fontSize: 14, fontFamily: 'serif', color: 'var(--text-primary)'
+              }}
+              onClick={() => setEditingItem({ ...editingItem, fontStyle: editingItem.fontStyle === 'italic' ? 'normal' : 'italic' })}
+              title="Italic"
+            >
+              I
+            </button>
+
+            <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
+
+            <button
+              style={{
+                width: 32, height: 32, border: 'none', background: 'transparent', color: 'var(--danger)',
+                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15
+              }}
+              onClick={() => {
+                setEditingItem({ ...editingItem, text: '' }) // Clearing text effectively deletes it
+                setTimeout(commitEdit, 0)
+              }}
+              title="Delete text"
+            >
+              🗑
+            </button>
+          </div>
+
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onKeyDown={handleEditorKeyDown}
+            style={{
+              position: 'absolute',
+              left: editingItem.bounds.x,
+              top: editingItem.bounds.y,
+              minWidth: editingItem.bounds.w,
+              fontSize: editingItem.fontSize * (canvasHeight / (editingItem.pageHeight || canvasHeight)), // EXACT SCALE Y
+              fontFamily: editingItem.fontFamily,
+              fontWeight: editingItem.fontWeight,
+              fontStyle: editingItem.fontStyle,
+              color: editingItem.color,
+              transform: editingItem.transform,
+              transformOrigin: 'top left',
+              letterSpacing: editingItem.letterSpacing,
+              background: 'transparent',
+              outline: '1px dashed #6366f1',
+              outlineOffset: '2px',
+              padding: 0,
+              margin: 0,
+              border: 'none',
+              whiteSpace: 'nowrap',
+              lineHeight: 1,
+              zIndex: 200,
+              cursor: 'text',
+            }}
+          >
+            {editingItem.text}
+          </div>
         </div>
       )}
 
@@ -424,15 +665,18 @@ export default function TextEditLayer({
               whiteSpace: 'nowrap',
               lineHeight: 1,
               zIndex: 16,
-              cursor: active ? 'text' : 'default',
+              cursor: active ? 'move' : 'default',
               pointerEvents: active ? 'auto' : 'none',
             }}
+            data-edited-id={edit.id}
+            data-item-index={edit.itemIndex}
+            title={active ? 'Double click to edit, drag to move' : undefined}
           >
             {edit.newText}
           </div>
         )
       })}
-    </>
+    </div>
   )
 }
 

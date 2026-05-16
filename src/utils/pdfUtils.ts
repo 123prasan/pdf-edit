@@ -37,7 +37,6 @@ export async function exportPdfWithAnnotations(
   // ---- Apply text edits ----
   for (const edit of textEdits) {
     if (!edit.bounds) continue
-    if (edit.newText === edit.originalText) continue
 
     const pageIndex = Math.max(0, edit.page - 1)
     if (pageIndex >= pdfDoc.getPageCount()) continue

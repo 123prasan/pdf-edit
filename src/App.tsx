@@ -675,6 +675,8 @@ export default function App() {
                       activeFont={activeFont}
                       setActiveColor={setActiveColor}
                       setActiveFont={setActiveFont}
+                      docFonts={docFonts}
+                      docColors={docColors}
                     />
                   )}
                 </div>
