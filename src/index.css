@@ -1,50 +1,51 @@
 /* ============================================================
-   PDF Studio — Enterprise-Grade Dark Theme
+   PDF Studio — Google Material Light Theme
    ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
   /* Core palette */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-surface: rgba(30, 41, 59, 0.85);
-  --bg-glass: rgba(15, 23, 42, 0.6);
-  --bg-hover: rgba(99, 102, 241, 0.12);
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f3f4;
+  --bg-surface: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-hover: rgba(26, 115, 232, 0.06);
 
   /* Accent */
-  --accent: #818cf8;
-  --accent-bright: #a5b4fc;
-  --accent-muted: #6366f1;
-  --accent-glow: rgba(99, 102, 241, 0.35);
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
+  --accent: #1a73e8;
+  --accent-bright: #4285f4;
+  --accent-muted: #174ea6;
+  --accent-glow: rgba(26, 115, 232, 0.25);
+  --success: #188038;
+  --warning: #f29900;
+  --danger: #d93025;
 
   /* Text */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #80868b;
 
   /* Borders */
-  --border-default: rgba(148, 163, 184, 0.12);
-  --border-hover: rgba(129, 140, 248, 0.3);
-  --border-active: rgba(129, 140, 248, 0.6);
+  --border-default: #dadce0;
+  --border-hover: rgba(26, 115, 232, 0.5);
+  --border-active: #1a73e8;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px var(--accent-glow);
+  /* Shadows (Material Elevation) */
+  --shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow-md: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-lg: 0 4px 6px 0 rgba(60, 64, 67, 0.3), 0 8px 24px 8px rgba(60, 64, 67, 0.15);
+  --shadow-glow: 0 0 0 3px var(--accent-glow);
 
-  /* Radii */
-  --radius-sm: 6px;
-  --radius-md: 10px;
+  /* Radii (Google's rounded look) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
   --radius-lg: 16px;
   --radius-xl: 24px;
 
   /* Transitions */
-  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 /* Reset */
@@ -65,7 +66,7 @@ body,
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Roboto', 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -140,6 +141,7 @@ body {
   border-right: 1px solid var(--border-default);
   overflow-y: auto;
   z-index: 50;
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-divider {
@@ -162,6 +164,7 @@ body {
   min-height: 48px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
   overflow-x: auto;
 }
 
@@ -197,8 +200,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #0b1120;
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+  background: var(--bg-tertiary);
 }
 
 .canvas-scroll {
@@ -282,13 +284,12 @@ body {
 
 .icon-btn:hover {
   background: var(--bg-hover);
-  color: var(--accent-bright);
+  color: var(--accent);
 }
 
 .icon-btn.active {
-  background: var(--accent-muted);
-  color: #fff;
-  box-shadow: var(--shadow-glow);
+  background: rgba(26, 115, 232, 0.1);
+  color: var(--accent);
 }
 
 .icon-btn:disabled {
@@ -331,23 +332,25 @@ body {
   padding: 8px 16px;
   border-radius: var(--radius-sm);
   border: none;
-  background: var(--accent-muted);
+  background: var(--accent);
   color: #fff;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s var(--ease-out);
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover {
-  background: var(--accent);
-  box-shadow: var(--shadow-glow);
+  background: var(--accent-bright);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
 }
 
 .btn-primary:active {
   transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:disabled {
@@ -433,7 +436,7 @@ body {
 select.input-sm {
   appearance: none;
   padding-right: 24px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235f6368' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 6px center;
 }
@@ -481,26 +484,26 @@ select.input-sm {
   gap: 20px;
   padding: 60px 80px;
   border: 2px dashed var(--border-default);
-  border-radius: var(--radius-xl);
-  background: var(--bg-surface);
-  backdrop-filter: blur(20px);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
   cursor: pointer;
-  transition: all 0.3s var(--ease-out);
+  transition: all 0.2s var(--ease-out);
   text-align: center;
   max-width: 520px;
+  box-shadow: var(--shadow-sm);
 }
 
 .drop-card:hover {
   border-color: var(--accent);
-  background: rgba(99, 102, 241, 0.06);
-  box-shadow: var(--shadow-glow);
+  background: var(--bg-hover);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
 .drop-card.drag-over {
   border-color: var(--accent-bright);
-  background: rgba(99, 102, 241, 0.1);
-  box-shadow: 0 0 40px var(--accent-glow);
+  background: var(--bg-hover);
+  box-shadow: var(--shadow-lg);
   transform: scale(1.02);
 }
 
@@ -584,12 +587,12 @@ select.input-sm {
 }
 
 .annotation-text-box {
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(26, 115, 232, 0.4);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 4px;
   padding: 6px 8px;
   backdrop-filter: blur(2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif !important;
   line-height: 1.5;
   word-wrap: break-word;
@@ -600,8 +603,8 @@ select.input-sm {
 
 .annotation-text-box.editing {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
 }
 
 .annotation-text-display {
@@ -750,12 +753,12 @@ select.input-sm {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 999px;
+  background: #dadce0;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #bdc1c6;
 }
 
 /* ============================================================
@@ -831,14 +834,34 @@ select.input-sm {
    Responsive
    ============================================================ */
 @media (max-width: 768px) {
+  .app-body {
+    flex-direction: column-reverse;
+    /* Sidebar moves to bottom */
+  }
+
   .sidebar {
-    width: 48px;
-    min-width: 48px;
+    width: 100%;
+    min-width: 100%;
+    height: 60px;
+    min-height: 60px;
+    flex-direction: row;
+    padding: 0 16px;
+    border-right: none;
+    border-top: 1px solid var(--border-default);
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 8px;
+  }
+
+  .sidebar-divider {
+    width: 1px;
+    height: 36px;
+    margin: 0 4px;
   }
 
   .icon-btn {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
   }
 
   .props-panel {
@@ -846,11 +869,20 @@ select.input-sm {
   }
 
   .drop-card {
-    padding: 40px 30px;
+    padding: 30px 20px;
+    margin: 0 16px;
+  }
+
+  .drop-title {
+    font-size: 18px;
   }
 
   .canvas-scroll {
-    padding: 16px;
+    padding: 12px;
+  }
+
+  .toolbar-strip {
+    padding: 8px;
   }
 }
 

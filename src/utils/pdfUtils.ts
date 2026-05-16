@@ -36,7 +36,7 @@ export async function exportPdfWithAnnotations(
 
   // ---- Apply text edits ----
   for (const edit of textEdits) {
-    if (!edit.transform || edit.transform.length < 6) continue
+    if (!edit.bounds) continue
     if (edit.newText === edit.originalText) continue
 
     const pageIndex = Math.max(0, edit.page - 1)
@@ -44,39 +44,44 @@ export async function exportPdfWithAnnotations(
     const page = pdfDoc.getPage(pageIndex)
     const pdfHeight = page.getHeight()
 
-    // PDF text transform: [a, b, c, d, e, f]
-    // For standard horizontal text: a = scaleX ≈ fontSize, d = scaleY ≈ fontSize
-    // e = x position in PDF points, f = y position in PDF points (y-up from bottom)
-    const tx = edit.transform
-    const a = tx[0], b = tx[1]  // first column of the 2×2 part
-    const e = tx[4], f = tx[5]  // translation
+    // Convert Canvas pixels (y-down) to PDF points (y-up)
+    const toX = (cx: number) => cx / canvasScale
+    const toY = (cy: number) => pdfHeight - cy / canvasScale
+    const toLen = (cl: number) => cl / canvasScale
 
-    // Font size = length of the first basis vector
-    const fontSize = Math.sqrt(a * a + b * b)
-    const x = e
-    const y = f  // already in PDF space (y-up), no flip needed
+    const x = toX(edit.bounds.x)
+    // pdf-lib drawRectangle y is the bottom-left corner
+    const bottomY = toY(edit.bounds.y + edit.bounds.h)
 
-    // Cover width = item.width (in PDF points), height = font size
-    const coverWidth = (edit.width > 0 ? edit.width : fontSize * (edit.originalText.length * 0.6)) + 4
-    const coverHeight = fontSize + 4
+    // 1. Redact/Erase the old text by drawing a white box over its exact footprint
+    page.drawRectangle({
+      x,
+      y: bottomY,
+      width: toLen(edit.bounds.w),
+      height: toLen(edit.bounds.h),
+      color: rgb(1, 1, 1), // White
+    })
 
-    // 2. Draw new text at same position
+    // 2. Draw new text into the PDF stream
     if (edit.newText.trim()) {
       const textCol = hexToRgb(edit.color || '#000000')
-      const safeFontSize = fontSize > 1 ? fontSize : 12
+      // edit.fontSize is stored raw, already in PDF points
+      const fontSize = edit.fontSize || toLen(edit.bounds.h) * 0.85
+
       try {
         page.drawText(edit.newText, {
           x,
-          y,
-          size: safeFontSize,
+          y: bottomY + (toLen(edit.bounds.h) * 0.2), // Adjust baseline slightly up
+          size: fontSize,
           font: helvetica,
           color: rgb(textCol.r, textCol.g, textCol.b),
         })
       } catch (_) {
-        // pdf-lib can fail on very long strings; try truncated
+        // Fallback truncation for massive strings
         page.drawText(edit.newText.slice(0, 200), {
-          x, y,
-          size: safeFontSize,
+          x,
+          y: bottomY + (toLen(edit.bounds.h) * 0.2),
+          size: fontSize,
           font: helvetica,
           color: rgb(textCol.r, textCol.g, textCol.b),
         })
@@ -128,7 +133,7 @@ export async function exportPdfWithAnnotations(
             })
             // Approximate character width for next position
             currentX += charFontSize * 0.5
-          } catch (_) {}
+          } catch (_) { }
         }
       } else {
         // Fallback to original behavior for backward compatibility
@@ -145,7 +150,7 @@ export async function exportPdfWithAnnotations(
               font: helvetica,
               color: rgb(col.r, col.g, col.b),
             })
-          } catch (_) {}
+          } catch (_) { }
         })
       }
 
@@ -169,7 +174,7 @@ export async function exportPdfWithAnnotations(
         const p1 = ann.path[i]
         page.drawLine({
           start: { x: toX(p0.x), y: toY(p0.y) },
-          end:   { x: toX(p1.x), y: toY(p1.y) },
+          end: { x: toX(p1.x), y: toY(p1.y) },
           thickness: Math.max(1.5 / canvasScale, 0.5),
           color: rgb(col.r, col.g, col.b),
           opacity: 1,

@@ -8,7 +8,7 @@ import {
   IconUpload, IconDownload, IconCursor, IconEdit, IconType, IconHighlighter,
   IconPen, IconHand, IconChevronLeft,
   IconChevronRight, IconTrash, IconUndo, IconRedo, IconPDF,
-  IconPlus, IconMinus, IconMaximize, IconFile
+  IconPlus, IconMinus, IconFile
 } from './components/Icons'
 import type { Annotation, ToolType } from './types'
 import { useExtractedText } from './hooks/useExtractedText'
@@ -27,7 +27,7 @@ export default function App() {
   const [fileName, setFileName] = useState<string>('')
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [scale, setScale] = useState(1.0)
+  const [scale, setScale] = useState(1.25)
   const [canvasWidth, setCanvasWidth] = useState(0)
   const [canvasHeight, setCanvasHeight] = useState(0)
   const [tool, setTool] = useState<ToolType>('select')
@@ -37,8 +37,19 @@ export default function App() {
   const [toastMsg, setToastMsg] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [textEdits, setTextEdits] = useState<TextEdit[]>([])
-  const [pdfPage, setPdfPage] = useState<any>(null)        // current pdf.js page object
-  const [pdfViewport, setPdfViewport] = useState<any>(null) // current viewport (at scale)
+  const [pdfPage, setPdfPage] = useState<any>(null)
+  const [pdfViewport, setPdfViewport] = useState<any>(null)
+  const [docColors, setDocColors] = useState<string[]>([])
+  const [docFonts, setDocFonts] = useState<string[]>([])
+  const [activeColor, setActiveColor] = useState<string | null>(null)
+  const [activeFont, setActiveFont] = useState<string | null>(null)
+  const [showColorPicker, setShowColorPicker] = useState(false)
+
+  const STANDARD_COLORS = [
+    '#000000', '#434343', '#666666', '#999999', '#B7B7B7', '#CCCCCC', '#D9D9D9', '#EFEFEF', '#F3F3F3', '#FFFFFF',
+    '#980000', '#FF0000', '#FF9900', '#FFFF00', '#00FF00', '#00FFFF', '#4A86E8', '#0000FF', '#9900FF', '#FF00FF',
+    '#E6B8AF', '#F4CCCC', '#FCE5CD', '#FFF2CC', '#D9EAD3', '#D0E0E3', '#C9DAF8', '#CFE2F3', '#D9D2E9', '#EAD1DC',
+  ]
 
   const { data: extractedItems, embeddedFonts, loading: extractLoading } = useExtractedText(pdfFileObj)
 
@@ -60,10 +71,12 @@ export default function App() {
     }
   }, [embeddedFonts])
 
-  // Inject Google Fonts for Fallbacks
+  // Inject Google Fonts for Fallbacks & Extract Document Palette
   useEffect(() => {
     if (!extractedItems) return
     const gFonts = new Set<string>()
+    const cSet = new Set<string>()
+    const fSet = new Set<string>()
     const knownGFonts = [
       'Montserrat', 'Poppins', 'Inter', 'Raleway', 'Oswald', 'Roboto',
       'Open Sans', 'Lato', 'Nunito', 'Work Sans', 'Rubik', 'Merriweather',
@@ -74,13 +87,22 @@ export default function App() {
 
     Object.values(extractedItems).forEach(pageItems => {
       pageItems.forEach((item: any) => {
+        if (item.color) cSet.add(item.color.toUpperCase())
         if (!item.fontFamily) return
         const firstFont = item.fontFamily.split(',')[0].replace(/['"]/g, '').trim()
+        fSet.add(firstFont)
         if (knownGFonts.includes(firstFont)) {
           gFonts.add(firstFont.replace(/ /g, '+'))
         }
       })
     })
+
+    const uniqueColors = Array.from(cSet).slice(0, 8)
+    const uniqueFonts = Array.from(fSet).slice(0, 5)
+    setDocColors(uniqueColors)
+    setDocFonts(uniqueFonts)
+    if (uniqueColors.length > 0 && !activeColor) setActiveColor(uniqueColors[0])
+    if (uniqueFonts.length > 0 && !activeFont) setActiveFont(uniqueFonts[0])
 
     if (gFonts.size > 0) {
       const familyQuery = Array.from(gFonts).map(f => `family=${f}:ital,wght@0,400;0,700;1,400;1,700`).join('&')
@@ -176,8 +198,8 @@ export default function App() {
 
       // INTERCEPT: Completely suppress canvas text rendering!
       // This allows us to replace all blurry PDF text with crisp vector HTML text.
-      ctx.fillText = function() {}
-      ctx.strokeText = function() {}
+      ctx.fillText = function () { }
+      ctx.strokeText = function () { }
 
       const transform = pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : null
 
@@ -214,6 +236,17 @@ export default function App() {
 
       const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) }) // copy to avoid detached buffer
       const pdf = await loadingTask.promise
+
+      // Calculate responsive scale to perfectly fit mobile, or 1.25 for desktop
+      const firstPage = await pdf.getPage(1)
+      const baseVp = firstPage.getViewport({ scale: 1.0 })
+      let initialScale = 1.25
+      if (window.innerWidth <= 768) {
+        // Screen width minus side padding (approx 32px)
+        const targetWidth = window.innerWidth - 32
+        initialScale = targetWidth / baseVp.width
+      }
+
       pdfDocRef.current = pdf
       setPdfBytes(bytes)
       pdfBytesRef.current = bytes
@@ -225,7 +258,7 @@ export default function App() {
       setHistory([[]])
       setHistoryIndex(0)
       setSelectedId(null)
-      setScale(1.0)
+      setScale(initialScale)
 
       // Bump pdfReady to trigger the useEffect render
       setPdfReady(prev => prev + 1)
@@ -337,14 +370,13 @@ export default function App() {
     if (selectedId) deleteAnnotation(selectedId)
   }, [selectedId, deleteAnnotation])
 
-  // ---- Keyboard shortcuts ----
+  // ---- Keyboard shortcuts   // Undo / Redo keyboard shortcuts ONLY (removed tool/zoom shortcuts for clean UI)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return
+      // Ignore if typing in an input or contenteditable
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if ((e.target as HTMLElement).isContentEditable) return
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        deleteSelected()
-      }
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault()
         undo()
@@ -353,18 +385,10 @@ export default function App() {
         e.preventDefault()
         redo()
       }
-      if (e.key === 'v') setTool('select')
-      if (e.key === 'e') setTool('edit')
-      if (e.key === 't') setTool('text')
-      if (e.key === 'h') setTool('highlight')
-      if (e.key === 'p') setTool('ink')
-      if (e.key === 'g') setTool('pan')
-      if (e.key === '+' || e.key === '=') setScale(s => Math.min(3, s + 0.1))
-      if (e.key === '-') setScale(s => Math.max(0.25, s - 0.1))
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [deleteSelected, undo, redo])
+  }, [undo, redo])
 
   // Finalize on mouseup — ONLY if a drag/resize actually happened
   useEffect(() => {
@@ -384,12 +408,6 @@ export default function App() {
     window.addEventListener('mouseup', handleMouseUp)
     return () => window.removeEventListener('mouseup', handleMouseUp)
   }, [historyIndex])
-
-  // ---- Zoom helpers ----
-  const zoomIn = () => setScale(s => Math.min(3, Math.round((s + 0.25) * 100) / 100))
-  const zoomOut = () => setScale(s => Math.max(0.25, Math.round((s - 0.25) * 100) / 100))
-  const zoomFit = () => setScale(1.0)
-  const zoomPercent = Math.round(scale * 100)
 
   // ---- Page navigation ----
   const prevPage = () => setCurrentPage(p => Math.max(1, p - 1))
@@ -444,6 +462,101 @@ export default function App() {
           <span>PDF Studio</span>
         </div>
 
+        {pdfBytes && (docColors.length > 0 || docFonts.length > 0) && (
+          <div className="doc-palette-header" style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, paddingLeft: '32px' }}>
+
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Colors
+                </span>
+                <button
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)',
+                    background: 'var(--bg-primary)', cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)'
+                  }}
+                >
+                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: activeColor || '#000', border: '1px solid var(--border-default)' }} />
+                  {activeColor || 'Select'}
+                </button>
+              </div>
+
+              {showColorPicker && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: '8px', zIndex: 100,
+                  background: 'var(--bg-primary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
+                  padding: '16px', boxShadow: 'var(--shadow-lg)', width: '280px',
+                  display: 'flex', flexDirection: 'column', gap: '16px'
+                }}>
+                  {docColors.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                        Document Colors
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
+                        {docColors.map(c => (
+                          <div
+                            key={c}
+                            onClick={() => { setActiveColor(c); setShowColorPicker(false); }}
+                            style={{
+                              width: 20, height: 20, borderRadius: 4, background: c,
+                              border: activeColor === c ? '2px solid var(--accent)' : '1px solid var(--border-default)',
+                              cursor: 'pointer', boxShadow: activeColor === c ? '0 0 0 2px rgba(26,115,232,0.2)' : 'none'
+                            }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      All Other Colors
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
+                      {STANDARD_COLORS.map(c => (
+                        <div
+                          key={c}
+                          onClick={() => { setActiveColor(c); setShowColorPicker(false); }}
+                          style={{
+                            width: 20, height: 20, borderRadius: 4, background: c,
+                            border: activeColor === c ? '2px solid var(--accent)' : '1px solid var(--border-default)',
+                            cursor: 'pointer', boxShadow: activeColor === c ? '0 0 0 2px rgba(26,115,232,0.2)' : 'none'
+                          }}
+                          title={c}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {docColors.length > 0 && docFonts.length > 0 && <div className="toolbar-sep" style={{ height: '20px', margin: '0' }} />}
+
+            {docFonts.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Document Fonts
+                </span>
+                <select
+                  className="input-sm"
+                  value={activeFont || ''}
+                  onChange={e => setActiveFont(e.target.value)}
+                  style={{ width: 140, padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}
+                >
+                  {docFonts.map(f => (
+                    <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="header-actions">
           <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
             <IconUpload />
@@ -487,18 +600,6 @@ export default function App() {
           </button>
 
           <div className="sidebar-spacer" />
-
-          {/* Zoom controls */}
-          <button className="icon-btn" onClick={zoomOut} title="Zoom Out">
-            <IconMinus />
-          </button>
-          <span className="zoom-label">{zoomPercent}%</span>
-          <button className="icon-btn" onClick={zoomIn} title="Zoom In">
-            <IconPlus />
-          </button>
-          <button className="icon-btn" onClick={zoomFit} title="Fit to Width">
-            <IconMaximize />
-          </button>
         </aside>
 
         {/* ---- Main Canvas Area ---- */}
@@ -540,6 +641,7 @@ export default function App() {
                     tool={tool}
                     page={currentPage}
                     scale={scale}
+                    activeColor={activeColor}
                     onAddAnnotation={addAnnotation}
                     onUpdateAnnotation={updateAnnotation}
                     onDeleteAnnotation={deleteAnnotation}
@@ -569,6 +671,10 @@ export default function App() {
                       }}
                       active={tool === 'edit'}
                       extractedItems={extractedItems}
+                      activeColor={activeColor}
+                      activeFont={activeFont}
+                      setActiveColor={setActiveColor}
+                      setActiveFont={setActiveFont}
                     />
                   )}
                 </div>
@@ -576,13 +682,11 @@ export default function App() {
 
               {/* Page Navigation */}
               <div className="page-nav">
-                <button className="icon-btn" onClick={prevPage} disabled={currentPage <= 1}>
+                <button className="icon-btn" onClick={prevPage} disabled={currentPage <= 1} title="Previous Page">
                   <IconChevronLeft />
                 </button>
-                <span className="page-info">
-                  Page <strong>{currentPage}</strong> of <strong>{numPages}</strong>
-                </span>
-                <button className="icon-btn" onClick={nextPage} disabled={currentPage >= numPages}>
+                <span className="page-info">Page <strong>{currentPage}</strong> of {numPages}</span>
+                <button className="icon-btn" onClick={nextPage} disabled={currentPage >= numPages} title="Next Page">
                   <IconChevronRight />
                 </button>
               </div>
@@ -605,10 +709,7 @@ export default function App() {
                 <label>Pages</label>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{numPages}</span>
               </div>
-              <div className="props-row">
-                <label>Zoom</label>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{zoomPercent}%</span>
-              </div>
+
             </div>
 
             <div>
@@ -781,8 +882,6 @@ export default function App() {
             <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
             <span>|</span>
             <span>Page {currentPage}/{numPages}</span>
-            <span>|</span>
-            <span>{zoomPercent}% zoom</span>
           </>
         )}
       </div>

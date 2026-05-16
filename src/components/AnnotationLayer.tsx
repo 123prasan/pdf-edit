@@ -19,6 +19,7 @@ type Props = {
   onDeleteAnnotation: (id: string) => void
   onSelectAnnotation: (id: string | null) => void
   selectedId: string | null
+  activeColor?: string | null
 }
 
 export default function AnnotationLayer({
@@ -33,6 +34,7 @@ export default function AnnotationLayer({
   onDeleteAnnotation,
   onSelectAnnotation,
   selectedId,
+  activeColor,
 }: Props) {
   const layerRef = useRef<HTMLDivElement | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -132,7 +134,7 @@ export default function AnnotationLayer({
         height: 60,
         text: '',
         fontSize: 14,
-        fontColor: '#000000',
+        fontColor: activeColor || '#000000',
         fontStyle: 'normal',
         fontWeight: 'normal',
       }

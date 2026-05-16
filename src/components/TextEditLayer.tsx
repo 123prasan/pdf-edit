@@ -62,6 +62,10 @@ type Props = {
   deleteSelected?: () => void
   active: boolean
   extractedItems: Record<number, any[]> | undefined
+  activeColor?: string | null
+  activeFont?: string | null
+  setActiveColor?: (c: string) => void
+  setActiveFont?: (f: string) => void
 }
 
 export default function TextEditLayer({
@@ -77,6 +81,10 @@ export default function TextEditLayer({
   deleteSelected,
   active,
   extractedItems,
+  activeColor,
+  activeFont,
+  setActiveColor,
+  setActiveFont,
 }: Props) {
   const hitLayerRef = useRef<HTMLDivElement | null>(null)
   const textItemsRef = useRef<any[]>([])
@@ -99,8 +107,25 @@ export default function TextEditLayer({
   } | null>(null)
 
   const editorRef = useRef<HTMLDivElement | null>(null)
+  let cancelled = false
 
-  // ---- Render pdf.js text layer (INVISIBLE hit targets) ----
+  // Sync editing item with external palette overrides
+  useEffect(() => {
+    if (editingItem && activeColor && activeColor.toUpperCase() !== editingItem.color.toUpperCase()) {
+      setEditingItem(prev => prev ? { ...prev, color: activeColor } : null)
+    }
+  }, [activeColor])
+
+  useEffect(() => {
+    if (editingItem && activeFont) {
+      const currentFont = editingItem.fontFamily.split(',')[0].replace(/['"]/g, '').trim()
+      if (activeFont !== currentFont) {
+        setEditingItem(prev => prev ? { ...prev, fontFamily: `"${activeFont}", sans-serif` } : null)
+      }
+    }
+  }, [activeFont])
+
+  // ---- Extract and inject fonts/css ----text layer (INVISIBLE hit targets) ----
   useEffect(() => {
     const container = hitLayerRef.current
     if (!pdfPage || !viewport || !container) return
@@ -225,6 +250,9 @@ export default function TextEditLayer({
     // The * 0.85 converts bounding-box height to font-size.
     const rawFontSize = rawItem.fontSize
     const pageHeight = rawItem.pageHeight
+
+    if (setActiveColor) setActiveColor(exactColor.toUpperCase())
+    if (setActiveFont) setActiveFont(fontFamily.split(',')[0].replace(/['"]/g, '').trim())
 
     setEditingItem({
       idx,
