@@ -24,13 +24,19 @@ SERIF_KEYWORDS = [
     "palatino", "bookman", "centuryschoolbook", "nimbusromno9l",
     "minion", "constantia", "cambria", "didot", "caslon", "baskerville",
     "bodoni", "rockwell", "charter", "utopia", "goudyoldsty",
+    "lucidabright", "merriweather", "playfair", "ptserif", "roboto-slab",
+    "lora", "bree", "slab", "arvo", "bitstreamvera", "hoefler",
+    "benguiat", "plantin", "sabong", "sylfaen", "bellmt", "californian",
+    "elephant", "perpetua", "lucidafax"
 ]
 
 MONO_KEYWORDS = [
     "courier", "couriernew", "courier10pitch", "lucidatypewriter",
     "consolasconsolas", "inconsolata", "dejavusansmono", "droidsansmono",
     "liberationmono", "nimbusmonol", "anonymouspro", "sourcecodepro",
-    "spacemono", "mono", "typewriter", "consolas", "menlo",
+    "spacemono", "mono", "typewriter", "consolas", "menlo", "monaco",
+    "firamono", "ubuntumono", "bitstreamverasansmono", "oxygenmono",
+    "jetbrainsmono", "cascadiacode", "cascadiamono", "andale", "lucidaconsole"
 ]
 
 SANS_KEYWORDS = [
@@ -38,7 +44,10 @@ SANS_KEYWORDS = [
     "futura", "gill", "optima", "myriad", "nimbussanl", "freesans",
     "liberationsans", "dejavusans", "opensans", "roboto", "lato",
     "sourcesanspro", "notosans", "ubuntu", "frutiger", "univers",
-    "franklin", "gothic", "sans",
+    "franklin", "gothic", "sans", "lucidasans", "segoe", "corbel",
+    "candara", "montserrat", "raleway", "poppins", "oswald", "ptsans",
+    "droidsans", "applesdgothic", "inter", "nunito", "quicksand",
+    "work-sans", "firasans", "rubik", "karla", "heebo", "hind"
 ]
 
 def normalize_font_name(raw_name: str) -> dict:
@@ -138,11 +147,21 @@ def _build_css_stack(ns: str, original: str, generic: str) -> str:
         if "constantia" in ns:
             return 'Constantia, serif'
         if "baskerville" in ns:
-            return 'Baskerville, serif'
+            return 'Baskerville, "Baskerville Old Face", "Hoefler Text", serif'
         if "caslon" in ns:
-            return '"Adobe Caslon Pro", serif'
+            return '"Adobe Caslon Pro", "Big Caslon", serif'
         if "minion" in ns:
             return '"Minion Pro", serif'
+        if "merriweather" in ns:
+            return 'Merriweather, serif'
+        if "playfair" in ns:
+            return '"Playfair Display", serif'
+        if "lora" in ns:
+            return 'Lora, serif'
+        if "lucidabright" in ns or "lucidafax" in ns:
+            return '"Lucida Bright", "Lucida Fax", serif'
+        if "perpetua" in ns:
+            return 'Perpetua, serif'
         return '"Times New Roman", Times, serif'
 
     # --- Sans-serif ---
@@ -171,15 +190,15 @@ def _build_css_stack(ns: str, original: str, generic: str) -> str:
     if "myriad" in ns:
         return '"Myriad Pro", sans-serif'
     if "segoeui" in ns or "segoe" in ns:
-        return '"Segoe UI", sans-serif'
+        return '"Segoe UI", Tahoma, Geneva, sans-serif'
     if "opensans" in ns:
         return '"Open Sans", sans-serif'
     if "roboto" in ns:
-        return 'Roboto, sans-serif'
+        return 'Roboto, "Helvetica Neue", Arial, sans-serif'
     if "lato" in ns:
         return 'Lato, sans-serif'
     if "sourcesans" in ns:
-        return '"Source Sans Pro", sans-serif'
+        return '"Source Sans Pro", "Source Sans 3", sans-serif'
     if "notosans" in ns:
         return '"Noto Sans", sans-serif'
     if "liberationsans" in ns or "liberarion" in ns:
@@ -187,9 +206,21 @@ def _build_css_stack(ns: str, original: str, generic: str) -> str:
     if "dejavusans" in ns:
         return '"DejaVu Sans", Arial, sans-serif'
     if "frutiger" in ns:
-        return 'Frutiger, "Frutiger Linotype", sans-serif'
+        return 'Frutiger, "Frutiger Linotype", Univers, sans-serif'
     if "univers" in ns:
-        return 'Univers, sans-serif'
+        return 'Univers, "Zurich BT", sans-serif'
+    if "montserrat" in ns:
+        return 'Montserrat, sans-serif'
+    if "poppins" in ns:
+        return 'Poppins, sans-serif'
+    if "inter" in ns:
+        return 'Inter, -apple-system, sans-serif'
+    if "lucidasans" in ns:
+        return '"Lucida Sans", "Lucida Grande", sans-serif'
+    if "corbel" in ns:
+        return 'Corbel, sans-serif'
+    if "candara" in ns:
+        return 'Candara, sans-serif'
 
     # Fallback
     return '"Helvetica Neue", Arial, sans-serif'

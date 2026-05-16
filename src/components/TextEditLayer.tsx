@@ -130,11 +130,23 @@ export default function TextEditLayer({
           const y = item.y * scaleY
           const w = item.width * scaleX
           const h = item.height * scaleY
+          const exactFontSize = item.fontSize * scaleY
 
+          const isEdited = textEdits.some(e => e.page === page && e.itemIndex === i && e.newText !== item.str)
+
+          span.textContent = item.str
           span.style.cssText = `
             position: absolute; left: ${x}px; top: ${y}px; 
             width: ${w}px; height: ${h}px;
-            font-size: ${h}px; color: transparent; cursor: text;
+            font-size: ${exactFontSize}px; 
+            color: ${item.color || '#000000'}; 
+            cursor: text;
+            font-family: ${item.fontFamily || 'sans-serif'};
+            font-weight: ${item.fontWeight || 'normal'};
+            font-style: ${item.fontStyle || 'normal'};
+            line-height: 1;
+            white-space: pre;
+            visibility: ${isEdited ? 'hidden' : 'visible'};
           `
           container.appendChild(span)
         })
@@ -150,25 +162,7 @@ export default function TextEditLayer({
     return () => { cancelled = true }
   }, [pdfPage, viewport, page, extractedItems])
 
-  // After render, erase canvas areas for existing edits
-  useEffect(() => {
-    if (!rendered) return
-    const canvas = canvasRef.current
-    const container = hitLayerRef.current
-    if (!canvas || !container) return
-
-    const containerRect = container.getBoundingClientRect()
-    const timer = setTimeout(() => {
-      for (const edit of textEdits) {
-        if (edit.page !== page) continue
-        if (edit.bounds) {
-          eraseCanvasArea(canvas, edit.bounds, containerRect) // FIX 3
-        }
-      }
-    }, 120)
-
-    return () => clearTimeout(timer)
-  }, [rendered, textEdits, page, canvasRef])
+  // Canvas erasure no longer needed! We are using purely HTML text over an intercepted canvas.
 
   // Focus editor when opened
   useEffect(() => {
@@ -215,16 +209,8 @@ export default function TextEditLayer({
       h: spanRect.height,
     }
 
-    // Erase canvas before edit begins!
-    const canvas = canvasRef.current
-    if (canvas) {
-      const key = `${page}-${idx}`
-      if (!savedCanvasRef.current.has(key)) {
-        const saved = saveCanvasArea(canvas, bounds, containerRect)
-        if (saved) savedCanvasRef.current.set(key, saved)
-      }
-      eraseCanvasArea(canvas, bounds, containerRect) // FIX 3
-    }
+    // Hide the native HTML span so the editor div can take its place seamlessly
+    span.style.visibility = 'hidden'
 
     // We use the exact PyMuPDF backend data directly!
     const exactColor = rawItem.color || '#000000'
@@ -281,31 +267,20 @@ export default function TextEditLayer({
         pageHeight: editingItem.pageHeight,
       })
     } else {
-      // Revert canvas
-      const key = `${page}-${editingItem.idx}`
-      const saved = savedCanvasRef.current.get(key)
-      const canvas = canvasRef.current
-      const container = hitLayerRef.current
-      if (saved && canvas && container) {
-        restoreCanvasArea(canvas, editingItem.bounds, container, saved)
-        savedCanvasRef.current.delete(key)
-      }
+      // Revert visibility if they didn't change the text
+      const span = hitLayerRef.current?.querySelector(`[data-item-index="${editingItem.idx}"]`) as HTMLSpanElement
+      if (span) span.style.visibility = 'visible'
     }
-
     setEditingItem(null)
   }, [editingItem, onTextEdit, page, textEdits, scale])
 
   // ---- Cancel edit ----
   const cancelEdit = useCallback(() => {
     if (!editingItem) return
-    const key = `${page}-${editingItem.idx}`
-    const saved = savedCanvasRef.current.get(key)
-    const canvas = canvasRef.current
-    const container = hitLayerRef.current
-    if (saved && canvas && container) {
-      restoreCanvasArea(canvas, editingItem.bounds, container, saved)
-      savedCanvasRef.current.delete(key)
-    }
+    // Revert visibility since we cancelled
+    const span = hitLayerRef.current?.querySelector(`[data-item-index="${editingItem.idx}"]`) as HTMLSpanElement
+    if (span) span.style.visibility = 'visible'
+
     setEditingItem(null)
   }, [editingItem, page, canvasRef])
 

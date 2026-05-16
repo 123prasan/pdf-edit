@@ -51,11 +51,51 @@ export default function App() {
       style.id = 'pdf-embedded-fonts'
       style.textContent = Object.entries(embeddedFonts).map(([fontName, dataUrl]) => {
         const cssName = fontName.replace(/^[A-Z]{6}\+/, '')
-        return `@font-face { font-family: "${cssName}"; src: url("${dataUrl}"); }`
+        const lower = cssName.toLowerCase()
+        const fw = (lower.includes('bold') || lower.includes('black') || lower.includes('heavy') || lower.includes('semibold')) ? 'bold' : 'normal'
+        const fs = (lower.includes('italic') || lower.includes('oblique') || lower.includes('slanted') || lower.endsWith('it')) ? 'italic' : 'normal'
+        return `@font-face { font-family: "${cssName}"; src: url("${dataUrl}"); font-weight: ${fw}; font-style: ${fs}; }`
       }).join('\n')
       document.head.appendChild(style)
     }
   }, [embeddedFonts])
+
+  // Inject Google Fonts for Fallbacks
+  useEffect(() => {
+    if (!extractedItems) return
+    const gFonts = new Set<string>()
+    const knownGFonts = [
+      'Montserrat', 'Poppins', 'Inter', 'Raleway', 'Oswald', 'Roboto',
+      'Open Sans', 'Lato', 'Nunito', 'Work Sans', 'Rubik', 'Merriweather',
+      'Playfair Display', 'Lora', 'Source Sans Pro', 'Source Sans 3',
+      'Noto Sans', 'Fira Sans', 'Karla', 'Heebo', 'Hind', 'PT Sans',
+      'EB Garamond', 'PT Serif', 'Bree Serif', 'Arvo'
+    ]
+
+    Object.values(extractedItems).forEach(pageItems => {
+      pageItems.forEach((item: any) => {
+        if (!item.fontFamily) return
+        const firstFont = item.fontFamily.split(',')[0].replace(/['"]/g, '').trim()
+        if (knownGFonts.includes(firstFont)) {
+          gFonts.add(firstFont.replace(/ /g, '+'))
+        }
+      })
+    })
+
+    if (gFonts.size > 0) {
+      const familyQuery = Array.from(gFonts).map(f => `family=${f}:ital,wght@0,400;0,700;1,400;1,700`).join('&')
+      const url = `https://fonts.googleapis.com/css2?${familyQuery}&display=swap`
+
+      const existing = document.getElementById('google-fonts-dynamic')
+      if (existing) existing.remove()
+
+      const link = document.createElement('link')
+      link.id = 'google-fonts-dynamic'
+      link.rel = 'stylesheet'
+      link.href = url
+      document.head.appendChild(link)
+    }
+  }, [extractedItems])
 
   // Undo / Redo
   const [history, setHistory] = useState<Annotation[][]>([[]])
@@ -133,6 +173,11 @@ export default function App() {
       canvas.height = Math.floor(vp.height * pixelRatio)
       const ctx = canvas.getContext('2d')
       if (!ctx) return
+
+      // INTERCEPT: Completely suppress canvas text rendering!
+      // This allows us to replace all blurry PDF text with crisp vector HTML text.
+      ctx.fillText = function() {}
+      ctx.strokeText = function() {}
 
       const transform = pixelRatio !== 1 ? [pixelRatio, 0, 0, pixelRatio, 0, 0] : null
 
