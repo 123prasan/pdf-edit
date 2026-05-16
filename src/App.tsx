@@ -136,6 +136,12 @@ export default function App() {
     pdfBytesRef.current = pdfBytes
   }, [pdfBytes])
 
+  // ---- Warm up the server on app load (prevents Render cold-start delay) ----
+  useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    fetch(`${API_URL}/health`).catch(() => {/* silently ignore */})
+  }, [])
+
   // ---- Toast helper ----
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg)
