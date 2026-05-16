@@ -1,8 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 import fitz
 import re
 import base64
+import json
 
 app = FastAPI()
 
@@ -333,6 +335,185 @@ async def extract_text(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def hex_to_rgb(hex_color: str):
+    if not hex_color or not isinstance(hex_color, str):
+        return (0, 0, 0)
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) == 6:
+        try:
+            return tuple(int(hex_color[i:i+2], 16)/255.0 for i in (0, 2, 4))
+        except:
+            pass
+    return (0, 0, 0)
+
+@app.post("/export")
+async def export_pdf(
+    file: UploadFile = File(...),
+    annotations: str = Form(...),
+    textEdits: str = Form(...),
+    scale: float = Form(...)
+):
+    try:
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+
+        anns = json.loads(annotations)
+        edits = json.loads(textEdits)
+
+        for ann in anns:
+            page_num = int(ann.get("page", 1)) - 1
+            if page_num < 0 or page_num >= len(doc):
+                continue
+            page = doc[page_num]
+
+            if ann["type"] == "highlight":
+                rect = fitz.Rect(
+                    ann["x"] / scale,
+                    ann["y"] / scale,
+                    (ann["x"] + ann["width"]) / scale,
+                    (ann["y"] + ann["height"]) / scale
+                )
+                annot = page.add_highlight_annot(rect)
+                rgb = hex_to_rgb(ann.get("color", "#fbbf24"))
+                annot.set_colors(stroke=rgb)
+                annot.set_opacity(ann.get("opacity", 0.3))
+                annot.update()
+
+            elif ann["type"] == "ink":
+                path = ann.get("path", [])
+                if not path or len(path) < 2:
+                    continue
+                pts = [[(p["x"] / scale, p["y"] / scale) for p in path]]
+                annot = page.add_ink_annot(pts)
+                rgb = hex_to_rgb(ann.get("fontColor", "#818cf8"))
+                annot.set_colors(stroke=rgb)
+                annot.set_border(width=2.5 / scale)
+                annot.update()
+
+            elif ann["type"] == "text":
+                text = ann.get("text", "")
+                if not text.strip():
+                    continue
+                font_size = ann.get("fontSize", 14)
+                rgb = hex_to_rgb(ann.get("fontColor", "#000000"))
+                # Generous rect to ensure it fits without wrapping early
+                rect = fitz.Rect(
+                    ann["x"] / scale,
+                    ann["y"] / scale,
+                    (ann["x"] + ann.get("width", 200)) / scale + 500,
+                    (ann["y"] + ann.get("height", 50)) / scale + 500
+                )
+                try:
+                    page.insert_textbox(rect, text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+                except Exception as ex:
+                    safe_text = text.encode("ascii", "ignore").decode("ascii")
+                    page.insert_textbox(rect, safe_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+
+            elif ann["type"] in ["rect", "ellipse"]:
+                rect = fitz.Rect(
+                    ann["x"] / scale,
+                    ann["y"] / scale,
+                    (ann["x"] + ann["width"]) / scale,
+                    (ann["y"] + ann["height"]) / scale
+                )
+                stroke_rgb = hex_to_rgb(ann.get("strokeColor", "#000000"))
+                fill_color = ann.get("fillColor", "transparent")
+                fill_rgb = hex_to_rgb(fill_color) if fill_color and fill_color != "transparent" else None
+                width = ann.get("strokeWidth", 2) / scale
+                
+                if ann["type"] == "rect":
+                    annot = page.add_rect_annot(rect)
+                else:
+                    annot = page.add_circle_annot(rect)
+                
+                annot.set_colors(stroke=stroke_rgb, fill=fill_rgb)
+                annot.set_border(width=width)
+                annot.update()
+
+            elif ann["type"] == "line":
+                p1 = fitz.Point(ann["x"] / scale, ann["y"] / scale)
+                p2 = fitz.Point(ann.get("x2", ann["x"]) / scale, ann.get("y2", ann["y"]) / scale)
+                stroke_rgb = hex_to_rgb(ann.get("strokeColor", "#000000"))
+                width = ann.get("strokeWidth", 2) / scale
+                
+                annot = page.add_line_annot(p1, p2)
+                annot.set_colors(stroke=stroke_rgb)
+                annot.set_border(width=width)
+                annot.update()
+
+        for edit in edits:
+            page_num = int(edit.get("page", 1)) - 1
+            if page_num < 0 or page_num >= len(doc):
+                continue
+            page = doc[page_num]
+            
+            bounds = edit.get("bounds")
+            orig_bounds = edit.get("originalBounds") or bounds
+            
+            if orig_bounds and edit.get("itemIndex", -1) >= 0:
+                rect = fitz.Rect(
+                    orig_bounds["x"] / scale,
+                    orig_bounds["y"] / scale,
+                    (orig_bounds["x"] + orig_bounds["w"]) / scale,
+                    (orig_bounds["y"] + orig_bounds["h"]) / scale
+                )
+                page.draw_rect(rect, color=None, fill=(1, 1, 1), overlay=True)
+            
+            new_text = edit.get("newText", "")
+            if not new_text.strip():
+                continue
+            
+            font_size = edit.get("fontSize", 12)
+            rgb = hex_to_rgb(edit.get("color", "#000000"))
+            
+            fontname = "helv"
+            family = edit.get("fontFamily", "").lower()
+            if "times" in family or "serif" in family:
+                fontname = "tiro"
+            elif "courier" in family or "mono" in family:
+                fontname = "cour"
+                
+            if edit.get("fontWeight") == "bold":
+                if edit.get("fontStyle") == "italic":
+                    fontname = fontname.replace("ro", "bi").replace("helv", "hebi").replace("cour", "cobi")
+                else:
+                    fontname = fontname.replace("ro", "bo").replace("helv", "hebo").replace("cour", "cobo")
+            elif edit.get("fontStyle") == "italic":
+                fontname = fontname.replace("ro", "it").replace("helv", "heit").replace("cour", "coit")
+
+            if bounds:
+                # Expand the box massively so PyMuPDF never rejects it due to tight browser DOM bounds
+                insert_rect = fitz.Rect(
+                    bounds["x"] / scale,
+                    bounds["y"] / scale,
+                    (bounds["x"] + bounds["w"]) / scale + 500,
+                    (bounds["y"] + bounds["h"]) / scale + 500
+                )
+                print(f"DEBUG: inserting text '{new_text}' with fontname '{fontname}'")
+                try:
+                    page.insert_textbox(insert_rect, new_text, fontname=fontname, fontsize=font_size, color=rgb, align=0)
+                except Exception as ex:
+                    print(f"DEBUG: insert_textbox failed: {ex}")
+                    # Fallback 1: Force helv
+                    try:
+                        print("DEBUG: Retrying with standard 'helv'")
+                        page.insert_textbox(insert_rect, new_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+                    except Exception as ex2:
+                        print(f"DEBUG: Fallback 1 failed: {ex2}")
+                        # Fallback 2: Encode to ascii
+                        safe_text = new_text.encode("ascii", "ignore").decode("ascii")
+                        print(f"DEBUG: Retrying with safe ascii text '{safe_text}'")
+                        page.insert_textbox(insert_rect, safe_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+
+        out_bytes = doc.write()
+        doc.close()
+        return Response(content=out_bytes, media_type="application/pdf")
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -1,12 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
+import AnnotationLayer from './components/AnnotationLayer'
+import TextEditLayer from './components/TextEditLayer'
 import type { TextEdit } from './components/TextEditLayer'
-import PdfPageRenderer from './components/PdfPageRenderer'
+import { exportPdfWithAnnotations } from './utils/pdfUtils'
 import {
   IconUpload, IconDownload, IconCursor, IconEdit, IconType, IconHighlighter,
   IconPen, IconHand, IconChevronLeft,
   IconChevronRight, IconTrash, IconUndo, IconRedo, IconPDF,
-  IconPlus, IconMinus, IconFile, IconSquare, IconCircle, IconLine
+  IconPlus, IconMinus, IconFile
 } from './components/Icons'
 import type { Annotation, ToolType } from './types'
 import { useExtractedText } from './hooks/useExtractedText'
@@ -129,7 +131,6 @@ export default function App() {
   const isDraggingRef = useRef(false)                    // track if we're in a drag/resize
   const [pdfReady, setPdfReady] = useState(0)           // bumped each time a new PDF doc is loaded
   const [serverDocId, setServerDocId] = useState<string | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
 
   // Keep pdfBytesRef in sync
   useEffect(() => {
@@ -325,40 +326,25 @@ export default function App() {
   // ---- Export ----
   const handleExport = useCallback(async () => {
     const bytes = pdfBytesRef.current
-    if (!bytes || !pdfFileObj) {
-      showToast('No PDF file loaded.')
-      return
-    }
-    setIsExporting(true)
-    showToast('Applying high-fidelity edits on server... Please wait.')
+    if (!bytes) return
+    setLoading(true)
     try {
-      const formData = new FormData()
-      formData.append('file', pdfFileObj)
-      formData.append('annotations', JSON.stringify(annotations))
-      formData.append('textEdits', JSON.stringify(textEdits))
-      formData.append('scale', scale.toString())
-
-      const res = await fetch('http://localhost:8000/export', {
-        method: 'POST',
-        body: formData
-      })
-      if (!res.ok) throw new Error('Server export failed')
-
-      const exportedBlob = await res.blob()
-      const url = URL.createObjectURL(exportedBlob)
+      const exported = await exportPdfWithAnnotations(bytes, annotations, textEdits, scale)
+      const blob = new Blob([exported], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = fileName ? fileName.replace(/\.pdf$/i, '_edited.pdf') : 'edited.pdf'
       a.click()
       URL.revokeObjectURL(url)
-      showToast('PDF exported securely with pixel-perfect accuracy!')
+      showToast('PDF exported successfully!')
     } catch (err) {
       console.error(err)
-      showToast('Export failed. Make sure server is running.')
+      showToast('Export failed. Please try again.')
     } finally {
-      setIsExporting(false)
+      setLoading(false)
     }
-  }, [annotations, textEdits, scale, fileName, showToast, pdfFileObj])
+  }, [annotations, textEdits, scale, fileName, showToast])
 
   // ---- Annotation CRUD ----
   const addAnnotation = useCallback((ann: Annotation) => {
@@ -600,55 +586,46 @@ export default function App() {
         <div className="header-actions">
           <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
             <IconUpload />
-            <span className="hide-mobile">Open PDF</span>
+            Open PDF
           </button>
-          <button className={`btn-primary ${isExporting ? 'exporting' : ''}`} onClick={handleExport} disabled={!pdfBytes || isExporting}>
-            {isExporting ? <div className="spinner" /> : <IconDownload />}
-            <span className="hide-mobile">{isExporting ? 'Exporting...' : 'Export'}</span>
+          <button className="btn-primary" onClick={handleExport} disabled={!pdfBytes}>
+            <IconDownload />
+            Export
           </button>
         </div>
       </header>
-
-      {/* Exporting Overlay */}
-      {isExporting && (
-        <div className="export-overlay">
-          <div className="export-card">
-            <div className="spinner-large" />
-            <h3>Processing PDF</h3>
-            <p>Applying changes pin-to-pin accurately...</p>
-          </div>
-        </div>
-      )}
 
       {/* ============ BODY ============ */}
       <div className="app-body">
 
         {/* ---- Left Sidebar ---- */}
-        <aside className="tools-sidebar">
+        <aside className="sidebar">
           <ToolBtn value="select" icon={<IconCursor />} label="Select (V)" />
           <ToolBtn value="edit" icon={<IconEdit />} label="Edit Text (E)" />
           <ToolBtn value="text" icon={<IconType />} label="Add Text (T)" />
           <ToolBtn value="highlight" icon={<IconHighlighter />} label="Highlight (H)" />
           <ToolBtn value="ink" icon={<IconPen />} label="Freehand (P)" />
-          <ToolBtn value="rect" icon={<IconSquare />} label="Rectangle" />
-          <ToolBtn value="ellipse" icon={<IconCircle />} label="Circle" />
-          <ToolBtn value="line" icon={<IconLine />} label="Line" />
           <ToolBtn value="pan" icon={<IconHand />} label="Pan (G)" />
 
-          <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
+          <div className="sidebar-divider" />
 
-          <button className="tool-btn" onClick={undo} disabled={historyIndex <= 0} title="Undo">
+          <button className="icon-btn" onClick={undo} disabled={historyIndex <= 0} title="Undo">
             <IconUndo />
+            <span className="btn-tooltip">Undo (Ctrl+Z)</span>
           </button>
-          <button className="tool-btn" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo">
+          <button className="icon-btn" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo">
             <IconRedo />
+            <span className="btn-tooltip">Redo (Ctrl+Y)</span>
           </button>
 
-          <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
+          <div className="sidebar-divider" />
 
-          <button className="tool-btn" onClick={deleteSelected} disabled={!selectedId} title="Delete">
+          <button className="icon-btn" onClick={deleteSelected} disabled={!selectedId} title="Delete">
             <IconTrash />
+            <span className="btn-tooltip">Delete (Del)</span>
           </button>
+
+          <div className="sidebar-spacer" />
         </aside>
 
         {/* ---- Main Canvas Area ---- */}
@@ -675,42 +652,71 @@ export default function App() {
             </div>
           ) : (
             <>
-              {/* Vertical Scroll PDF Container */}
-              <div className="canvas-scroll" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
-                {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
-                  <PdfPageRenderer
-                    key={pageNum}
-                    pdfDoc={pdfDocRef.current}
-                    pageNumber={pageNum}
-                    scale={scale}
+              {/* Canvas + Annotation overlay */}
+              <div className="canvas-scroll">
+                {/* canvasWidth/Height already = naturalSize × scale from vp.width/vp.height */}
+                <div className="canvas-wrapper" style={{ width: canvasWidth, height: canvasHeight }}>
+                  <canvas
+                    ref={canvasRef}
+                    style={{ display: 'block', width: canvasWidth, height: canvasHeight }}
+                  />
+                  <AnnotationLayer
+                    canvasWidth={canvasWidth}
+                    canvasHeight={canvasHeight}
+                    annotations={annotations.filter(a => a.page === currentPage)}
                     tool={tool}
+                    page={currentPage}
+                    scale={scale}
                     activeColor={activeColor}
-                    activeFont={activeFont}
-                    setActiveColor={setActiveColor}
-                    setActiveFont={setActiveFont}
-                    docFonts={docFonts}
-                    docColors={docColors}
-                    extractedItems={extractedItems}
-                    annotations={annotations.filter(a => a.page === pageNum)}
-                    textEdits={textEdits}
-                    selectedId={selectedId}
                     onAddAnnotation={addAnnotation}
                     onUpdateAnnotation={updateAnnotation}
                     onDeleteAnnotation={deleteAnnotation}
                     onSelectAnnotation={setSelectedId}
-                    onTextEdit={(edit) => {
-                      setTextEdits(prev => {
-                        const idx = prev.findIndex(e => e.id === edit.id)
-                        if (idx >= 0) {
-                          const updated = [...prev]
-                          updated[idx] = edit
-                          return updated
-                        }
-                        return [...prev, edit]
-                      })
-                    }}
+                    selectedId={selectedId}
                   />
-                ))}
+                  {pdfPage && pdfViewport && (
+                    <TextEditLayer
+                      pdfPage={pdfPage}
+                      viewport={pdfViewport}
+                      scale={scale}
+                      page={currentPage}
+                      canvasWidth={canvasWidth}
+                      canvasHeight={canvasHeight}
+                      canvasRef={canvasRef}
+                      textEdits={textEdits}
+                      onTextEdit={(edit) => {
+                        setTextEdits(prev => {
+                          const idx = prev.findIndex(e => e.id === edit.id)
+                          if (idx >= 0) {
+                            const updated = [...prev]
+                            updated[idx] = edit
+                            return updated
+                          }
+                          return [...prev, edit]
+                        })
+                      }}
+                      tool={tool}
+                      extractedItems={extractedItems}
+                      activeColor={activeColor}
+                      activeFont={activeFont}
+                      setActiveColor={setActiveColor}
+                      setActiveFont={setActiveFont}
+                      docFonts={docFonts}
+                      docColors={docColors}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Page Navigation */}
+              <div className="page-nav">
+                <button className="icon-btn" onClick={prevPage} disabled={currentPage <= 1} title="Previous Page">
+                  <IconChevronLeft />
+                </button>
+                <span className="page-info">Page <strong>{currentPage}</strong> of {numPages}</span>
+                <button className="icon-btn" onClick={nextPage} disabled={currentPage >= numPages} title="Next Page">
+                  <IconChevronRight />
+                </button>
               </div>
             </>
           )}
@@ -860,51 +866,6 @@ export default function App() {
                   </div>
                 )}
 
-                {(selectedAnn.type === 'rect' || selectedAnn.type === 'ellipse' || selectedAnn.type === 'line') && (
-                  <>
-                    <div className="props-row">
-                      <label>Stroke</label>
-                      <input
-                        type="color"
-                        className="color-swatch"
-                        value={selectedAnn.strokeColor || '#000000'}
-                        onChange={(e) => {
-                          updateAnnotation(selectedAnn.id, { strokeColor: e.target.value })
-                        }}
-                      />
-                    </div>
-                    {selectedAnn.type !== 'line' && (
-                      <div className="props-row">
-                        <label>Fill</label>
-                        <input
-                          type="color"
-                          className="color-swatch"
-                          value={selectedAnn.fillColor || '#transparent'}
-                          onChange={(e) => {
-                            updateAnnotation(selectedAnn.id, { fillColor: e.target.value })
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="props-row">
-                      <label>Thickness</label>
-                      <input
-                        type="number"
-                        className="input-sm input-sm-narrow"
-                        value={selectedAnn.strokeWidth || 2}
-                        min={1}
-                        max={20}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value)
-                          if (!isNaN(val)) {
-                            updateAnnotation(selectedAnn.id, { strokeWidth: val })
-                          }
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
-
                 <div style={{ marginTop: 8 }}>
                   <button className="btn-ghost" onClick={() => deleteAnnotation(selectedAnn.id)} style={{ color: 'var(--danger)', borderColor: 'rgba(248, 113, 113, 0.3)', width: '100%', justifyContent: 'center' }}>
                     <IconTrash />
@@ -952,6 +913,6 @@ export default function App() {
           </>
         )}
       </div>
-    </div >
+    </div>
   )
 }

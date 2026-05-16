@@ -43,9 +43,9 @@ export type TextEdit = {
   fontWeight: string   // FIX 1: was missing from type
   fontStyle: string    // FIX 1: was missing from type
   color: string
-  transform: string | undefined
   letterSpacing: string | undefined
   bounds?: { x: number; y: number; w: number; h: number }
+  originalBounds?: { x: number; y: number; w: number; h: number }
   pageHeight?: number
 }
 
@@ -60,7 +60,7 @@ type Props = {
   textEdits: TextEdit[]
   onTextEdit: (edit: TextEdit) => void
   deleteSelected?: () => void
-  active: boolean
+  tool: string
   extractedItems: Record<number, any[]> | undefined
   activeColor?: string | null
   activeFont?: string | null
@@ -81,7 +81,7 @@ export default function TextEditLayer({
   textEdits,
   onTextEdit,
   deleteSelected,
-  active,
+  tool,
   extractedItems,
   activeColor,
   activeFont,
@@ -91,6 +91,8 @@ export default function TextEditLayer({
   docColors = [],
 }: Props) {
   const hitLayerRef = useRef<HTMLDivElement | null>(null)
+  const layerRef = useRef<HTMLDivElement | null>(null)
+  const active = tool === 'edit' || tool === 'text'
   const textItemsRef = useRef<any[]>([])
   const savedCanvasRef = useRef<Map<string, ImageData>>(new Map())
   const [rendered, setRendered] = useState(false)
@@ -168,7 +170,7 @@ export default function TextEditLayer({
             w = editRecord.bounds.w
             h = editRecord.bounds.h
           }
-          const isEditedText = editRecord && editRecord.newText !== item.str
+          const isEditedText = !!editRecord
 
           span.textContent = item.str
           span.style.cssText = `
@@ -201,7 +203,7 @@ export default function TextEditLayer({
 
     doRender()
     return () => { cancelled = true }
-  }, [pdfPage, viewport, page, extractedItems, active, textEdits])
+  }, [pdfPage, viewport, page, extractedItems, tool, textEdits])
 
   // Canvas erasure no longer needed! We are using purely HTML text over an intercepted canvas.
 
@@ -233,14 +235,43 @@ export default function TextEditLayer({
   } | null>(null)
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const active = tool === 'edit' || tool === 'text'
     if (!active || editingItem) return
     const target = e.target as HTMLElement
     const isEditedDiv = target.dataset.editedId !== undefined
     const itemIndexStr = isEditedDiv ? target.dataset.itemIndex : target.closest('[data-item-index]')?.getAttribute('data-item-index')
+
+    // If clicking on empty canvas while using 'Add Text' tool
+    if (!itemIndexStr && tool === 'text') {
+      const rect = layerRef.current?.getBoundingClientRect()
+      if (!rect) return
+
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      const newIdx = -Date.now() // Use a negative timestamp to represent a new, non-PDF element
+
+      setEditingItem({
+        idx: newIdx,
+        originalText: '',
+        text: '',
+        bounds: { x: px, y: py, w: 100, h: 20 },
+        fontSize: 16,
+        fontFamily: activeFont ? `"${activeFont}", sans-serif` : 'sans-serif',
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        color: activeColor || '#000000',
+        transform: 'matrix(1, 0, 0, 1, 0, 0)',
+        letterSpacing: 0,
+        pageHeight: canvasHeight
+      })
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+
     if (!itemIndexStr) return
 
     const idx = parseInt(itemIndexStr, 10)
-    if (idx < 0) return
 
     const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
     if (!span) return
@@ -290,7 +321,7 @@ export default function TextEditLayer({
 
       const containerRect = hitLayerRef.current?.parentElement?.getBoundingClientRect()
       const spanRect = d.span.getBoundingClientRect()
-      if (!containerRect || !rawItem) return
+      if (!containerRect || (!rawItem && d.idx >= 0)) return
 
       const newBounds = {
         x: spanRect.left - containerRect.left,
@@ -299,27 +330,38 @@ export default function TextEditLayer({
         h: spanRect.height,
       }
 
+      const scaleX = canvasWidth / (rawItem?.pageWidth || canvasWidth)
+      const scaleY = canvasHeight / (rawItem?.pageHeight || canvasHeight)
+      const originalBounds = existingEdit?.originalBounds || (rawItem ? {
+        x: rawItem.x * scaleX,
+        y: rawItem.y * scaleY,
+        w: rawItem.width * scaleX,
+        h: rawItem.height * scaleY
+      } : undefined)
+
       onTextEdit({
         id: existingEdit?.id || `te_${page}_${d.idx}`,
         page,
         itemIndex: d.idx,
-        originalText: rawItem.str,
-        newText: existingEdit?.newText ?? rawItem.str,
-        fontSize: existingEdit?.fontSize || rawItem.fontSize,
-        fontFamily: existingEdit?.fontFamily || getWebFontMetrics(rawItem?.fontName).fontFamily,
-        fontWeight: existingEdit?.fontWeight || (rawItem.fontWeight === 'bold' ? 'bold' : getWebFontMetrics(rawItem?.fontName).fontWeight),
-        fontStyle: existingEdit?.fontStyle || (rawItem.fontStyle === 'italic' ? 'italic' : getWebFontMetrics(rawItem?.fontName).fontStyle),
-        color: existingEdit?.color || rawItem.color || '#000000',
+        originalText: rawItem?.str || '',
+        newText: existingEdit?.newText ?? rawItem?.str ?? '',
+        fontSize: existingEdit?.fontSize || (rawItem?.fontSize ?? 16),
+        fontFamily: existingEdit?.fontFamily || (rawItem ? getWebFontMetrics(rawItem?.fontName).fontFamily : 'sans-serif'),
+        fontWeight: existingEdit?.fontWeight || (rawItem?.fontWeight === 'bold' ? 'bold' : (rawItem ? getWebFontMetrics(rawItem?.fontName).fontWeight : 'normal')),
+        fontStyle: existingEdit?.fontStyle || (rawItem?.fontStyle === 'italic' ? 'italic' : (rawItem ? getWebFontMetrics(rawItem?.fontName).fontStyle : 'normal')),
+        color: existingEdit?.color || rawItem?.color || '#000000',
         bounds: newBounds,
-        transform: existingEdit?.transform,
-        letterSpacing: existingEdit?.letterSpacing,
-        pageHeight: existingEdit?.pageHeight || rawItem.pageHeight,
+        originalBounds,
+        transform: existingEdit?.transform || 'matrix(1, 0, 0, 1, 0, 0)',
+        letterSpacing: existingEdit?.letterSpacing || 0,
+        pageHeight: existingEdit?.pageHeight || rawItem?.pageHeight || canvasHeight,
       })
     }
   }, [onTextEdit, page, textEdits])
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!active) return
+    const active = tool === 'edit' || tool === 'text'
+    if (!active || editingItem) return
 
     const target = e.target as HTMLElement
     const isEditedDiv = target.dataset.editedId !== undefined
@@ -330,7 +372,39 @@ export default function TextEditLayer({
     e.preventDefault()
 
     const idx = parseInt(itemIndexStr, 10)
-    if (idx < 0) return
+
+    // If it's a new text block created by the Add Text tool (negative idx)
+    if (idx < 0) {
+      const existingEdit = textEdits.find(te => te.page === page && te.itemIndex === idx)
+      if (!existingEdit) return
+
+      const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
+      if (!span) return
+      const containerRect = hitLayerRef.current?.parentElement?.getBoundingClientRect()
+      const spanRect = span.getBoundingClientRect()
+      if (!containerRect) return
+
+      setEditingItem({
+        idx,
+        text: existingEdit.newText,
+        originalText: '',
+        bounds: {
+          x: spanRect.left - containerRect.left,
+          y: spanRect.top - containerRect.top,
+          w: spanRect.width,
+          h: spanRect.height,
+        },
+        fontSize: existingEdit.fontSize,
+        fontFamily: existingEdit.fontFamily,
+        fontWeight: existingEdit.fontWeight,
+        fontStyle: existingEdit.fontStyle,
+        color: existingEdit.color,
+        transform: existingEdit.transform,
+        letterSpacing: existingEdit.letterSpacing,
+        pageHeight: existingEdit.pageHeight,
+      })
+      return
+    }
 
     const rawItem = textItemsRef.current[idx]
     if (!rawItem || !rawItem.str) return
@@ -378,7 +452,7 @@ export default function TextEditLayer({
       letterSpacing: existingEdit?.letterSpacing,
       pageHeight: existingEdit?.pageHeight || pageHeight,
     })
-  }, [active, page, textEdits, setActiveColor, setActiveFont])
+  }, [tool, page, textEdits, setActiveColor, setActiveFont])
 
 
   // ---- Commit edit ----
@@ -397,6 +471,15 @@ export default function TextEditLayer({
       editingItem.fontFamily !== (existing?.fontFamily ?? rawItem?.fontFamily) ||
       editingItem.fontSize !== (existing?.fontSize ?? rawItem?.fontSize)
 
+    const scaleX = canvasWidth / (rawItem?.pageWidth || canvasWidth)
+    const scaleY = canvasHeight / (rawItem?.pageHeight || canvasHeight)
+    const originalBounds = existing?.originalBounds || (rawItem ? {
+      x: rawItem.x * scaleX,
+      y: rawItem.y * scaleY,
+      w: rawItem.width * scaleX,
+      h: rawItem.height * scaleY
+    } : undefined)
+
     if (textChanged || styleChanged || existing) {
       onTextEdit({
         id: existing?.id ?? `textedit-${page}-${editingItem.idx}-${Date.now()}`,
@@ -405,6 +488,7 @@ export default function TextEditLayer({
         originalText: existing?.originalText ?? editingItem.originalText,
         newText: currentText,
         bounds: editingItem.bounds,
+        originalBounds,
         color: editingItem.color,
         fontSize: editingItem.fontSize, // FIX 2: store raw, not divided by scale again
         fontFamily: editingItem.fontFamily,
@@ -444,6 +528,7 @@ export default function TextEditLayer({
 
   return (
     <div
+      ref={layerRef}
       className="text-edit-container"
       style={{
         position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight,
@@ -465,6 +550,37 @@ export default function TextEditLayer({
           '--scale-factor': viewport?.scale || scale,
         } as React.CSSProperties}
       />
+
+      {/* Background Erasure layer */}
+      {extractedItems?.[page]?.map((item, i) => {
+        const isEditingThis = editingItem?.idx === i
+        const committedEdit = textEdits.find(e => e.page === page && e.itemIndex === i)
+
+        if (!isEditingThis && !committedEdit) return null
+
+        const scaleX = canvasWidth / item.pageWidth
+        const scaleY = canvasHeight / item.pageHeight
+        const x = item.x * scaleX
+        const y = item.y * scaleY
+        const w = item.width * scaleX
+        const h = item.height * scaleY
+
+        return (
+          <div
+            key={`erase-${i}`}
+            style={{
+              position: 'absolute',
+              left: x,
+              top: y,
+              width: w,
+              height: h,
+              backgroundColor: 'white', // Blocks the canvas text underneath
+              zIndex: 1,
+              pointerEvents: 'none',
+            }}
+          />
+        )
+      })}
 
       {/* Floating Editable Div */}
       {editingItem && (

@@ -57,11 +57,12 @@ export default function AnnotationLayer({
     origH: number
   } | null>(null)
 
-  // Drawing state (highlight rect or ink path)
+  // Drawing state (highlight rect or ink path or shapes)
   const [inkPreview, setInkPreview] = useState<Point[] | null>(null)
   const [highlightPreview, setHighlightPreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [shapePreview, setShapePreview] = useState<{ type: string; x: number; y: number; w: number; h: number; x2?: number; y2?: number } | null>(null)
   const drawRef = useRef<{
-    type: 'highlight' | 'ink'
+    type: 'highlight' | 'ink' | 'rect' | 'ellipse' | 'line'
     startX: number
     startY: number
     path: Point[]
@@ -122,31 +123,15 @@ export default function AnnotationLayer({
 
     const coords = getLocalCoords(e)
 
-    if (tool === 'text') {
-      const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()
-      const newAnn: Annotation = {
-        id,
-        type: 'text',
-        page,
-        x: coords.x,
-        y: coords.y,
-        width: 200,
-        height: 60,
-        text: '',
-        fontSize: 14,
-        fontColor: activeColor || '#000000',
-        fontStyle: 'normal',
-        fontWeight: 'normal',
-      }
-      onAddAnnotation(newAnn)
-      setEditingId(id)
-      onSelectAnnotation(id)
-    } else if (tool === 'highlight') {
+    if (tool === 'highlight') {
       drawRef.current = { type: 'highlight', startX: coords.x, startY: coords.y, path: [] }
       setHighlightPreview({ x: coords.x, y: coords.y, w: 0, h: 0 })
     } else if (tool === 'ink') {
       drawRef.current = { type: 'ink', startX: coords.x, startY: coords.y, path: [coords] }
       setInkPreview([coords])
+    } else if (tool === 'rect' || tool === 'ellipse' || tool === 'line') {
+      drawRef.current = { type: tool, startX: coords.x, startY: coords.y, path: [] }
+      setShapePreview({ type: tool, x: coords.x, y: coords.y, w: 0, h: 0, x2: coords.x, y2: coords.y })
     } else if (tool === 'select') {
       onSelectAnnotation(null)
     }
@@ -166,6 +151,16 @@ export default function AnnotationLayer({
       const w = Math.abs(coords.x - d.startX)
       const h = Math.abs(coords.y - d.startY)
       setHighlightPreview({ x, y, w, h })
+    } else if (drawRef.current.type === 'rect' || drawRef.current.type === 'ellipse') {
+      const d = drawRef.current
+      const x = Math.min(d.startX, coords.x)
+      const y = Math.min(d.startY, coords.y)
+      const w = Math.abs(coords.x - d.startX)
+      const h = Math.abs(coords.y - d.startY)
+      setShapePreview({ type: d.type, x, y, w, h })
+    } else if (drawRef.current.type === 'line') {
+      const d = drawRef.current
+      setShapePreview({ type: d.type, x: d.startX, y: d.startY, w: 0, h: 0, x2: coords.x, y2: coords.y })
     }
   }
 
@@ -212,10 +207,45 @@ export default function AnnotationLayer({
           width: maxX - minX,
           height: maxY - minY,
           path: d.path,
-          fontColor: '#818cf8',
+          fontColor: activeColor || '#818cf8',
         })
       }
       setInkPreview(null)
+    } else if (d.type === 'rect' || d.type === 'ellipse') {
+      const w = Math.abs(coords.x - d.startX)
+      const h = Math.abs(coords.y - d.startY)
+      if (w > 5 && h > 5) {
+        const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()
+        onAddAnnotation({
+          id,
+          type: d.type,
+          page,
+          x: Math.min(d.startX, coords.x),
+          y: Math.min(d.startY, coords.y),
+          width: w,
+          height: h,
+          strokeColor: activeColor || '#000000',
+          strokeWidth: 2,
+          fillColor: 'transparent',
+        })
+      }
+      setShapePreview(null)
+    } else if (d.type === 'line') {
+      const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()
+      onAddAnnotation({
+        id,
+        type: 'line',
+        page,
+        x: d.startX,
+        y: d.startY,
+        width: 0,
+        height: 0,
+        x2: coords.x,
+        y2: coords.y,
+        strokeColor: activeColor || '#000000',
+        strokeWidth: 2,
+      })
+      setShapePreview(null)
     }
 
     drawRef.current = null
@@ -280,8 +310,9 @@ export default function AnnotationLayer({
       onMouseDown={handleLayerMouseDown}
       onMouseMove={handleLayerMouseMove}
       onMouseUp={handleLayerMouseUp}
+      onMouseLeave={handleLayerMouseUp}
     >
-      {/* Highlight preview while drawing */}
+      {/* HIGHLIGHT PREVIEW */}
       {highlightPreview && (
         <div
           style={{
@@ -298,133 +329,51 @@ export default function AnnotationLayer({
         />
       )}
 
-      {/* Ink preview while drawing */}
+      {/* INK PREVIEW */}
       {inkPreview && inkPreview.length > 1 && (
-        <svg
-          className="ink-preview-svg"
-          width={canvasWidth}
-          height={canvasHeight}
-          style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
-        >
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight, pointerEvents: 'none' }}>
           <polyline
             points={inkPreview.map(p => `${p.x},${p.y}`).join(' ')}
             fill="none"
-            stroke="rgba(129, 140, 248, 0.7)"
-            strokeWidth={2.5 / scale}
-            strokeLinejoin="round"
+            stroke={activeColor || '#818cf8'}
+            strokeWidth={3}
             strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
       )}
 
-      {/* Rendered annotations */}
+      {/* SHAPE PREVIEWS */}
+      {shapePreview && shapePreview.type === 'rect' && (
+        <div style={{
+          position: 'absolute', left: shapePreview.x, top: shapePreview.y,
+          width: shapePreview.w, height: shapePreview.h,
+          border: `2px solid ${activeColor || '#000'}`, pointerEvents: 'none'
+        }} />
+      )}
+      {shapePreview && shapePreview.type === 'ellipse' && (
+        <div style={{
+          position: 'absolute', left: shapePreview.x, top: shapePreview.y,
+          width: shapePreview.w, height: shapePreview.h,
+          border: `2px solid ${activeColor || '#000'}`, borderRadius: '50%', pointerEvents: 'none'
+        }} />
+      )}
+      {shapePreview && shapePreview.type === 'line' && (
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight, pointerEvents: 'none' }}>
+          <line
+            x1={shapePreview.x}
+            y1={shapePreview.y}
+            x2={shapePreview.x2}
+            y2={shapePreview.y2}
+            stroke={activeColor || '#000'}
+            strokeWidth={2}
+          />
+        </svg>
+      )}
+
+      {/* RENDERED ANNOTATIONS */}
       {annotations.map(ann => {
         const isSelected = selectedId === ann.id
-        const isEditing = editingId === ann.id
-
-        if (ann.type === 'text') {
-          // Build chars array from text if not present
-          const chars = ann.chars || (ann.text ? ann.text.split('').map(char => ({
-            char,
-            fontSize: ann.fontSize || 14,
-            fontColor: ann.fontColor || '#000000',
-            fontStyle: ann.fontStyle || 'normal',
-            fontWeight: ann.fontWeight || 'normal',
-          })) : [])
-
-          return (
-            <div
-              key={ann.id}
-              className={`annotation-item annotation-text-box ${isEditing ? 'editing' : ''} ${isSelected ? 'selected' : ''}`}
-              style={{
-                left: ann.x,
-                top: ann.y,
-                width: ann.width,
-                height: ann.height,
-                fontSize: ann.fontSize || 14,
-                color: ann.fontColor || '#000000',
-                fontStyle: ann.fontStyle || 'normal',
-                fontWeight: ann.fontWeight || 'normal',
-              }}
-              onMouseDown={(e) => handleAnnotationMouseDown(e, ann)}
-              onDoubleClick={() => handleDoubleClick(ann)}
-            >
-              {isEditing ? (
-                <div
-                  className="annotation-contenteditable"
-                  contentEditable
-                  suppressContentEditableWarning
-                  autoFocus
-                  onInput={(e) => {
-                    const text = e.currentTarget.innerText || ''
-                    const prevChars = ann.chars || []
-                    const lastChar = prevChars[prevChars.length - 1]
-                    const newChars = text.split('').map(char => ({
-                      char,
-                      fontSize: lastChar?.fontSize || ann.fontSize || 14,
-                      fontColor: lastChar?.fontColor || ann.fontColor || '#000000',
-                      fontStyle: lastChar?.fontStyle || ann.fontStyle || 'normal',
-                      fontWeight: lastChar?.fontWeight || ann.fontWeight || 'normal',
-                    }))
-                    onUpdateAnnotation(ann.id, { text, chars: newChars })
-                  }}
-                  onBlur={() => setEditingId(null)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      e.currentTarget.blur()
-                      setEditingId(null)
-                    }
-                  }}
-                  style={{
-                    fontSize: ann.fontSize || 14,
-                    color: ann.fontColor || '#000000',
-                    fontStyle: ann.fontStyle || 'normal',
-                    fontWeight: ann.fontWeight || 'normal',
-                  }}
-                />
-              ) : (
-                <div className="annotation-text-display" style={{
-                  fontSize: ann.fontSize || 14,
-                  color: ann.fontColor || '#000000',
-                  fontStyle: ann.fontStyle || 'normal',
-                  fontWeight: ann.fontWeight || 'normal',
-                }}>
-                  {chars.length > 0 ? (
-                    chars.map((c, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: c.fontSize,
-                          color: c.fontColor,
-                          fontStyle: c.fontStyle,
-                          fontWeight: c.fontWeight,
-                          display: 'inline',
-                        }}
-                      >
-                        {c.char === '\n' ? <br /> : c.char}
-                      </span>
-                    ))
-                  ) : (
-                    <span>Double-click to edit</span>
-                  )}
-                </div>
-              )}
-              {(isSelected || true) && (
-                <button
-                  className="annotation-delete-btn"
-                  onClick={(e) => { e.stopPropagation(); onDeleteAnnotation(ann.id) }}
-                  title="Delete"
-                >
-                  ×
-                </button>
-              )}
-              <div
-                className="annotation-resize-handle"
-                onMouseDown={(e) => handleResizeMouseDown(e, ann)}
-              />
-            </div>
-          )
-        }
 
         if (ann.type === 'highlight') {
           return (
@@ -463,7 +412,6 @@ export default function AnnotationLayer({
               style={{ left: 0, top: 0, width: canvasWidth, height: canvasHeight, pointerEvents: 'none' }}
             >
               <svg width={canvasWidth} height={canvasHeight} style={{ overflow: 'visible' }}>
-                {/* Wider invisible stroke for easier click selection */}
                 <polyline
                   points={ann.path.map(p => `${p.x},${p.y}`).join(' ')}
                   fill="none"
@@ -493,6 +441,69 @@ export default function AnnotationLayer({
               >
                 ×
               </button>
+            </div>
+          )
+        }
+
+        if (ann.type === 'rect' || ann.type === 'ellipse' || ann.type === 'line') {
+          return (
+            <div
+              key={ann.id}
+              className={`annotation-item ${isSelected ? 'selected' : ''}`}
+              style={{
+                left: ann.type === 'line' ? Math.min(ann.x, ann.x2!) : ann.x,
+                top: ann.type === 'line' ? Math.min(ann.y, ann.y2!) : ann.y,
+                width: ann.type === 'line' ? Math.max(Math.abs(ann.x2! - ann.x), 2) : ann.width,
+                height: ann.type === 'line' ? Math.max(Math.abs(ann.y2! - ann.y), 2) : ann.height,
+              }}
+              onMouseDown={(e) => handleAnnotationMouseDown(e, ann)}
+            >
+              <svg style={{ width: '100%', height: '100%', display: 'block', overflow: 'visible' }}>
+                {ann.type === 'rect' && (
+                  <rect
+                    x={0} y={0}
+                    width={ann.width} height={ann.height}
+                    fill={ann.fillColor === 'transparent' ? 'none' : ann.fillColor}
+                    stroke={ann.strokeColor || '#000'}
+                    strokeWidth={ann.strokeWidth || 2}
+                  />
+                )}
+                {ann.type === 'ellipse' && (
+                  <ellipse
+                    cx={ann.width / 2} cy={ann.height / 2}
+                    rx={Math.max(0, ann.width / 2 - (ann.strokeWidth || 2) / 2)}
+                    ry={Math.max(0, ann.height / 2 - (ann.strokeWidth || 2) / 2)}
+                    fill={ann.fillColor === 'transparent' ? 'none' : ann.fillColor}
+                    stroke={ann.strokeColor || '#000'}
+                    strokeWidth={ann.strokeWidth || 2}
+                  />
+                )}
+                {ann.type === 'line' && (
+                  <line
+                    x1={ann.x < ann.x2! ? 0 : Math.abs(ann.x2! - ann.x)}
+                    y1={ann.y < ann.y2! ? 0 : Math.abs(ann.y2! - ann.y)}
+                    x2={ann.x < ann.x2! ? Math.abs(ann.x2! - ann.x) : 0}
+                    y2={ann.y < ann.y2! ? Math.abs(ann.y2! - ann.y) : 0}
+                    stroke={ann.strokeColor || '#000'}
+                    strokeWidth={ann.strokeWidth || 2}
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+              {isSelected && (
+                <button
+                  className="annotation-delete-btn"
+                  onClick={(e) => { e.stopPropagation(); onDeleteAnnotation(ann.id) }}
+                >
+                  ×
+                </button>
+              )}
+              {isSelected && ann.type !== 'line' && (
+                <div
+                  className="annotation-resize-handle"
+                  onMouseDown={(e) => handleResizeMouseDown(e, ann)}
+                />
+              )}
             </div>
           )
         }

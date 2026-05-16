@@ -42,3 +42,6 @@ export const IconPDF = () => (
     <polyline points="10 9 9 9 8 9"/>
   </svg>
 )
+export const IconSquare = () => <svg {...s}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+export const IconCircle = () => <svg {...s}><circle cx="12" cy="12" r="10"/></svg>
+export const IconLine = () => <svg {...s}><line x1="5" y1="19" x2="19" y2="5"/></svg>

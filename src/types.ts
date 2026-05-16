@@ -12,7 +12,7 @@ export type CharStyle = {
   fontWeight: string
 }
 
-export type AnnotationType = 'text' | 'highlight' | 'ink'
+export type AnnotationType = 'text' | 'highlight' | 'ink' | 'rect' | 'ellipse' | 'line'
 
 export type Annotation = {
   id: string
@@ -35,6 +35,12 @@ export type Annotation = {
   /** Highlight colour */
   color?: string
   opacity?: number
+  /** Shape properties */
+  strokeColor?: string
+  strokeWidth?: number
+  fillColor?: string
+  x2?: number // For lines
+  y2?: number // For lines
 }
 
-export type ToolType = 'select' | 'edit' | 'text' | 'highlight' | 'ink' | 'pan'
+export type ToolType = 'select' | 'edit' | 'text' | 'highlight' | 'ink' | 'pan' | 'rect' | 'ellipse' | 'line'
