@@ -4,6 +4,14 @@
 
 export type Point = { x: number; y: number }
 
+export type CharStyle = {
+  char: string
+  fontSize: number
+  fontColor: string
+  fontStyle: string
+  fontWeight: string
+}
+
 export type AnnotationType = 'text' | 'highlight' | 'ink'
 
 export type Annotation = {
@@ -18,6 +26,10 @@ export type Annotation = {
   text?: string
   fontSize?: number
   fontColor?: string
+  fontStyle?: string
+  fontWeight?: string
+  /** Character-level styling array */
+  chars?: CharStyle[]
   /** Ink path — points relative to canvas origin, in PDF points */
   path?: Point[]
   /** Highlight colour */

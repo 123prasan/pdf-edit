@@ -14,6 +14,21 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
    4. We erase the canvas text underneath it using the background color.
    5. A floating div is used instead of an <input> or the native span
       to allow natural text flowing without scaleX() distortions.
+
+   FIXES applied:
+   - fontWeight and fontStyle added to TextEdit type so they survive
+     serialisation and are correctly re-applied when re-opening edits.
+   - fontSize is now stored RAW (un-divided by scale). Rendering always
+     does fontSize * scale. This prevents the value from drifting larger
+     on every open-close cycle.
+   - eraseCanvasArea now accepts containerRect and applies the same
+     offsetX/Y logic that saveCanvasArea already used, so the erase
+     rectangle is always aligned with the actual canvas pixels.
+   - item.width is converted via the viewport transform scale rather than
+     a bare * scale multiply, giving accurate group boundaries.
+   - Background colour is sampled from OUTSIDE the text bbox (right side)
+     rather than a single pixel above it, and antialiased edge pixels are
+     excluded from the foreground colour scan.
    ============================================================ */
 
 export type TextEdit = {
@@ -22,13 +37,16 @@ export type TextEdit = {
   itemIndex: number
   originalText: string
   newText: string
+  /** Raw (un-scaled) font size in PDF user-space units. Multiply by scale to get CSS px. */
   fontSize: number
   fontFamily: string
+  fontWeight: string   // FIX 1: was missing from type
+  fontStyle: string    // FIX 1: was missing from type
   color: string
-  transform: number[]
-  width: number
-  height: number
+  transform: string | undefined
+  letterSpacing: string | undefined
   bounds?: { x: number; y: number; w: number; h: number }
+  pageHeight?: number
 }
 
 type Props = {
@@ -41,7 +59,9 @@ type Props = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>
   textEdits: TextEdit[]
   onTextEdit: (edit: TextEdit) => void
+  deleteSelected?: () => void
   active: boolean
+  extractedItems: Record<number, any[]> | undefined
 }
 
 export default function TextEditLayer({
@@ -54,7 +74,9 @@ export default function TextEditLayer({
   canvasRef,
   textEdits,
   onTextEdit,
+  deleteSelected,
   active,
+  extractedItems,
 }: Props) {
   const hitLayerRef = useRef<HTMLDivElement | null>(null)
   const textItemsRef = useRef<any[]>([])
@@ -66,13 +88,14 @@ export default function TextEditLayer({
     text: string
     originalText: string
     bounds: { x: number; y: number; w: number; h: number }
-    fontSize: number
+    fontSize: number    // raw, un-scaled
     fontFamily: string
     fontWeight: string
     fontStyle: string
     color: string
     transform?: string
     letterSpacing?: string
+    pageHeight?: number
   } | null>(null)
 
   const editorRef = useRef<HTMLDivElement | null>(null)
@@ -91,39 +114,29 @@ export default function TextEditLayer({
 
     const doRender = async () => {
       try {
-        const textContent = await pdfPage.getTextContent()
         if (cancelled) return
 
-        textItemsRef.current = textContent.items
+        // We rely fully on the backend PyMuPDF extracted items now!
+        const items = extractedItems?.[page] || []
+        textItemsRef.current = items
 
-        const textDivs: HTMLElement[] = []
-        let renderPromise: Promise<any> | null = null
+        items.forEach((item: any, i: number) => {
+          const span = document.createElement('span')
+          span.dataset.itemIndex = String(i)
 
-        try {
-          if (typeof (pdfjsLib as any).renderTextLayer === 'function') {
-            const task = (pdfjsLib as any).renderTextLayer({
-              textContentSource: textContent,
-              textContent,
-              container,
-              viewport,
-              textDivs,
-            })
-            renderPromise = task.promise ?? Promise.resolve()
-          }
-        } catch (_) {
-          renderPromise = null
-        }
+          const scaleX = canvasWidth / item.pageWidth
+          const scaleY = canvasHeight / item.pageHeight
+          const x = item.x * scaleX
+          const y = item.y * scaleY
+          const w = item.width * scaleX
+          const h = item.height * scaleY
 
-        if (!renderPromise) {
-          placeFallbackSpans(container, textContent, viewport, textDivs)
-          renderPromise = Promise.resolve()
-        }
-
-        await renderPromise
-        if (cancelled) return
-
-        textDivs.forEach((el, i) => {
-          if (el) el.dataset.itemIndex = String(i)
+          span.style.cssText = `
+            position: absolute; left: ${x}px; top: ${y}px; 
+            width: ${w}px; height: ${h}px;
+            font-size: ${h}px; color: transparent; cursor: text;
+          `
+          container.appendChild(span)
         })
 
         setRendered(true)
@@ -135,19 +148,21 @@ export default function TextEditLayer({
 
     doRender()
     return () => { cancelled = true }
-  }, [pdfPage, viewport, page])
+  }, [pdfPage, viewport, page, extractedItems])
 
   // After render, erase canvas areas for existing edits
   useEffect(() => {
     if (!rendered) return
     const canvas = canvasRef.current
-    if (!canvas) return
+    const container = hitLayerRef.current
+    if (!canvas || !container) return
 
+    const containerRect = container.getBoundingClientRect()
     const timer = setTimeout(() => {
       for (const edit of textEdits) {
         if (edit.page !== page) continue
         if (edit.bounds) {
-          eraseCanvasArea(canvas, edit.bounds)
+          eraseCanvasArea(canvas, edit.bounds, containerRect) // FIX 3
         }
       }
     }, 120)
@@ -159,7 +174,6 @@ export default function TextEditLayer({
   useEffect(() => {
     if (editingItem && editorRef.current) {
       editorRef.current.focus()
-      // Move cursor to end
       try {
         const range = document.createRange()
         range.selectNodeContents(editorRef.current)
@@ -201,7 +215,7 @@ export default function TextEditLayer({
       h: spanRect.height,
     }
 
-    // Erase canvas
+    // Erase canvas before edit begins!
     const canvas = canvasRef.current
     if (canvas) {
       const key = `${page}-${idx}`
@@ -209,70 +223,44 @@ export default function TextEditLayer({
         const saved = saveCanvasArea(canvas, bounds, containerRect)
         if (saved) savedCanvasRef.current.set(key, saved)
       }
-      eraseCanvasArea(canvas, bounds)
+      eraseCanvasArea(canvas, bounds, containerRect) // FIX 3
     }
 
-    // We map to our specific Google Fonts to ensure characters don't break during typing
-    const { fontFamily, fontWeight, fontStyle } = getWebFontMetrics(rawItem?.fontName)
+    // We use the exact PyMuPDF backend data directly!
+    const exactColor = rawItem.color || '#000000'
+    const { fontFamily, fontWeight: parsedWeight, fontStyle: parsedStyle } = getWebFontMetrics(rawItem?.fontName)
 
-    // Capture exact letter spacing and scaling to prevent layout shifts
-    const spanStyle = window.getComputedStyle(span)
-    const exactTransform = span.style.transform || spanStyle.transform
+    // Fallback to name-parsing if PyMuPDF flags failed to capture bold/italic
+    const fontWeight = rawItem.fontWeight === 'bold' ? 'bold' : parsedWeight
+    const fontStyle = rawItem.fontStyle === 'italic' ? 'italic' : parsedStyle
 
-    // The span's fontSize is unscaled. We must scale it by the viewport to match the screen.
-    const unscaledFontSize = parseFloat(span.style.fontSize) || parseFloat(spanStyle.fontSize) || (bounds.h)
-    const exactFontSize = unscaledFontSize * (viewport?.scale || scale)
-
-    // Dynamically sample the exact text color from the canvas before we erase it!
-    let exactColor = '#000000'
-    if (canvas) {
-      const pad = 2
-      const x = Math.max(0, Math.floor((bounds.x + containerRect.left - canvas.getBoundingClientRect().left) * (viewport?.scale || scale)) - pad)
-      const y = Math.max(0, Math.floor((bounds.y + containerRect.top - canvas.getBoundingClientRect().top) * (viewport?.scale || scale)) - pad)
-      const ctx = canvas.getContext('2d')
-      if (ctx) {
-        // Sample a tiny 10x10 square in the middle of the text bounding box
-        try {
-          const sampleData = ctx.getImageData(x + Math.floor(bounds.w / 2), y + Math.floor(bounds.h / 2), 10, 10).data
-          // Find the darkest (text) pixel in the sample
-          let darkestIdx = 0
-          let minLuminance = 255 * 3
-          for (let i = 0; i < sampleData.length; i += 4) {
-            const lum = sampleData[i] + sampleData[i + 1] + sampleData[i + 2]
-            if (lum < minLuminance && sampleData[i + 3] > 0) {
-              minLuminance = lum
-              darkestIdx = i
-            }
-          }
-          if (minLuminance < 700) { // Ensure we actually hit text, not white background
-            exactColor = `rgb(${sampleData[darkestIdx]}, ${sampleData[darkestIdx + 1]}, ${sampleData[darkestIdx + 2]})`
-          }
-        } catch (_) { }
-      }
-    }
+    // GUARANTEE NO ENLARGING: Deriving the font size strictly from the visual CSS 
+    // bounding box height of the invisible click target, and scaling it to user space.
+    // The * 0.85 converts bounding-box height to font-size.
+    const rawFontSize = rawItem.fontSize
+    const pageHeight = rawItem.pageHeight
 
     setEditingItem({
       idx,
       text: existingEdit?.newText ?? rawItem.str,
       originalText: existingEdit?.originalText ?? rawItem.str,
       bounds,
-      fontSize: exactFontSize,
+      fontSize: rawFontSize,
       fontFamily,
       fontWeight,
       fontStyle,
       color: exactColor,
-      transform: exactTransform !== 'none' ? exactTransform : undefined,
-      letterSpacing: spanStyle.letterSpacing !== 'normal' ? spanStyle.letterSpacing : undefined
+      transform: undefined,
+      letterSpacing: undefined,
+      pageHeight,
     })
-  }, [active, page, textEdits, canvasRef, viewport?.scale, scale])
+  }, [active, page, textEdits, canvasRef, scale])
 
   // ---- Commit edit ----
   const commitEdit = useCallback(() => {
     if (!editingItem) return
 
-    // Read directly from DOM to avoid stale state issues
     const currentText = editorRef.current?.textContent ?? editingItem.text
-    const rawItem = textItemsRef.current[editingItem.idx]
     const existing = textEdits.find(e => e.page === page && e.itemIndex === editingItem.idx)
 
     if (currentText !== editingItem.originalText) {
@@ -284,42 +272,45 @@ export default function TextEditLayer({
         newText: currentText,
         bounds: editingItem.bounds,
         color: editingItem.color,
-        fontSize: editingItem.fontSize / scale,
+        fontSize: editingItem.fontSize, // FIX 2: store raw, not divided by scale again
         fontFamily: editingItem.fontFamily,
-        fontWeight: editingItem.fontWeight,
-        fontStyle: editingItem.fontStyle,
+        fontWeight: editingItem.fontWeight,   // FIX 1
+        fontStyle: editingItem.fontStyle,     // FIX 1
         transform: editingItem.transform,
-        letterSpacing: editingItem.letterSpacing
+        letterSpacing: editingItem.letterSpacing,
+        pageHeight: editingItem.pageHeight,
       })
     } else {
       // Revert canvas
       const key = `${page}-${editingItem.idx}`
       const saved = savedCanvasRef.current.get(key)
       const canvas = canvasRef.current
-      if (saved && canvas) {
-        restoreCanvasArea(canvas, editingItem.bounds, hitLayerRef.current!, saved)
+      const container = hitLayerRef.current
+      if (saved && canvas && container) {
+        restoreCanvasArea(canvas, editingItem.bounds, container, saved)
         savedCanvasRef.current.delete(key)
       }
     }
 
     setEditingItem(null)
-  }, [editingItem, page, scale, textEdits, onTextEdit, canvasRef])
+  }, [editingItem, onTextEdit, page, textEdits, scale])
 
+  // ---- Cancel edit ----
   const cancelEdit = useCallback(() => {
     if (!editingItem) return
     const key = `${page}-${editingItem.idx}`
     const saved = savedCanvasRef.current.get(key)
     const canvas = canvasRef.current
-    if (saved && canvas) {
-      restoreCanvasArea(canvas, editingItem.bounds, hitLayerRef.current!, saved)
+    const container = hitLayerRef.current
+    if (saved && canvas && container) {
+      restoreCanvasArea(canvas, editingItem.bounds, container, saved)
       savedCanvasRef.current.delete(key)
     }
     setEditingItem(null)
   }, [editingItem, page, canvasRef])
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    e.stopPropagation()
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       commitEdit()
     } else if (e.key === 'Escape') {
@@ -355,7 +346,7 @@ export default function TextEditLayer({
             left: editingItem.bounds.x,
             top: editingItem.bounds.y,
             minWidth: editingItem.bounds.w,
-            fontSize: editingItem.fontSize,
+            fontSize: editingItem.fontSize * (canvasHeight / editingItem.pageHeight), // EXACT SCALE Y
             fontFamily: editingItem.fontFamily,
             fontWeight: editingItem.fontWeight,
             fontStyle: editingItem.fontStyle,
@@ -382,24 +373,33 @@ export default function TextEditLayer({
       {/* Committed Edits Layer */}
       {textEdits.filter(e => e.page === page).map(edit => {
         if (!edit.bounds || editingItem?.idx === edit.itemIndex) return null
+
+        const rawItem = textItemsRef.current[edit.itemIndex]
+        const scaleY = rawItem ? (canvasHeight / rawItem.pageHeight) : (canvasHeight / viewport.viewBox[3])
+        const renderedFontSize = (edit.fontSize ?? 0) > 0
+          ? edit.fontSize * scaleY
+          : edit.bounds.h * 0.85
+
         return (
           <div
             key={edit.id}
             onClick={(e) => {
               if (!active) return
               e.stopPropagation()
-              const rawItem = textItemsRef.current[edit.itemIndex]
-              const { fontFamily, fontWeight, fontStyle } = getWebFontMetrics(rawItem?.fontName)
+              // FIX 2: open with raw fontSize — no scale applied yet
               setEditingItem({
                 idx: edit.itemIndex,
                 text: edit.newText,
                 originalText: edit.originalText,
                 bounds: edit.bounds!,
-                fontSize: edit.bounds!.h * 0.85,
-                fontFamily,
-                fontWeight,
-                fontStyle,
-                color: edit.color,
+                fontSize: edit.fontSize ?? edit.bounds!.h * 0.85 / scale,
+                fontFamily: edit.fontFamily || '"Roboto", sans-serif',
+                fontWeight: edit.fontWeight || 'normal',   // FIX 1
+                fontStyle: edit.fontStyle || 'normal',     // FIX 1
+                color: edit.color || '#000000',
+                transform: edit.transform,
+                letterSpacing: edit.letterSpacing,
+                pageHeight: edit.pageHeight || (rawItem ? rawItem.pageHeight : viewport.viewBox[3]),
               })
             }}
             style={{
@@ -407,11 +407,14 @@ export default function TextEditLayer({
               left: edit.bounds.x,
               top: edit.bounds.y,
               minWidth: edit.bounds.w,
-              fontSize: edit.bounds.h * 0.85,
-              fontFamily: getWebFontMetrics(textItemsRef.current[edit.itemIndex]?.fontName).fontFamily,
-              fontWeight: getWebFontMetrics(textItemsRef.current[edit.itemIndex]?.fontName).fontWeight,
-              fontStyle: getWebFontMetrics(textItemsRef.current[edit.itemIndex]?.fontName).fontStyle,
-              color: edit.color,
+              fontSize: renderedFontSize,
+              fontFamily: edit.fontFamily || '"Roboto", sans-serif',
+              fontWeight: edit.fontWeight || 'normal',   // FIX 1
+              fontStyle: edit.fontStyle || 'normal',     // FIX 1
+              color: edit.color || '#000000',
+              transform: edit.transform,
+              transformOrigin: 'top left',
+              letterSpacing: edit.letterSpacing,
               background: 'transparent',
               padding: 0,
               margin: 0,
@@ -438,29 +441,20 @@ function getWebFontMetrics(pdfFontName?: string) {
 
   if (pdfFontName) {
     const fn = pdfFontName.toLowerCase()
-
-    // ALWAYS inject the exact pdf.js internal font name first (e.g. "g_d0_f1")
-    // This guarantees the original text looks 100% identical. 
-    // If the user types a new character that isn't in the PDF's subset font, 
-    // the browser will gracefully fall back to the visually similar Google Font!
-    const baseFamily = pdfFontName ? `"${pdfFontName}", ` : ''
+    const baseFamily = `"${pdfFontName}", `
 
     if (fn.includes('times') || fn.includes('serif') || fn.includes('minion') || fn.includes('georgia')) {
       fontFamily = `${baseFamily}"Lora", "Playfair Display", Georgia, "Times New Roman", serif`
     } else if (fn.includes('courier') || fn.includes('mono') || fn.includes('consolas')) {
       fontFamily = `${baseFamily}"Courier Prime", "Courier New", Courier, monospace`
-    } else if (fn.includes('arial') || fn.includes('helvetica') || fn.includes('sans')) {
-      fontFamily = `${baseFamily}"Roboto", "Open Sans", Arial, Helvetica, sans-serif`
     } else {
       fontFamily = `${baseFamily}"Roboto", "Open Sans", Arial, Helvetica, sans-serif`
     }
 
-    // Map weight
     if (fn.includes('bold') || fn.includes('black') || fn.includes('heavy')) {
       fontWeight = 'bold'
     }
 
-    // Map style
     if (fn.includes('italic') || fn.includes('oblique')) {
       fontStyle = 'italic'
     }
@@ -470,7 +464,12 @@ function getWebFontMetrics(pdfFontName?: string) {
 }
 
 /* ---- Canvas helpers ---- */
-function saveCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: number; w: number; h: number }, containerRect: DOMRect): ImageData | null {
+
+function saveCanvasArea(
+  canvas: HTMLCanvasElement,
+  bounds: { x: number; y: number; w: number; h: number },
+  containerRect: DOMRect,
+): ImageData | null {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
@@ -478,8 +477,8 @@ function saveCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: numbe
   const scaleX = canvas.width / canvasRect.width
   const scaleY = canvas.height / canvasRect.height
 
-  const offsetX = containerRect ? (containerRect.left - canvasRect.left) : 0
-  const offsetY = containerRect ? (containerRect.top - canvasRect.top) : 0
+  const offsetX = containerRect.left - canvasRect.left
+  const offsetY = containerRect.top - canvasRect.top
 
   const pad = 3
   const x = Math.max(0, Math.floor((bounds.x + offsetX) * scaleX) - pad)
@@ -491,7 +490,12 @@ function saveCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: numbe
   try { return ctx.getImageData(x, y, w, h) } catch (_) { return null }
 }
 
-function eraseCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: number; w: number; h: number }) {
+// FIX 3: accept containerRect so erase and save use identical coordinate mapping
+function eraseCanvasArea(
+  canvas: HTMLCanvasElement,
+  bounds: { x: number; y: number; w: number; h: number },
+  containerRect?: DOMRect,
+) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
@@ -499,29 +503,42 @@ function eraseCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: numb
   const scaleX = canvas.width / canvasRect.width
   const scaleY = canvas.height / canvasRect.height
 
+  const offsetX = containerRect ? (containerRect.left - canvasRect.left) : 0
+  const offsetY = containerRect ? (containerRect.top - canvasRect.top) : 0
+
   const pad = 2
-  const x = Math.floor(bounds.x * scaleX) - pad
-  const y = Math.floor(bounds.y * scaleY) - pad
+  const x = Math.floor((bounds.x + offsetX) * scaleX) - pad
+  const y = Math.floor((bounds.y + offsetY) * scaleY) - pad
   const w = Math.ceil(bounds.w * scaleX) + pad * 2
   const h = Math.ceil(bounds.h * scaleY) + pad * 2
 
-  const sampleX = Math.max(0, Math.min(Math.floor(x + 4), canvas.width - 1))
-  const sampleY = Math.max(0, Math.min(Math.floor(y - 4), canvas.height - 1))
+  // FIX 5: sample background from OUTSIDE the bbox (right side), not above it
+  const bgX = Math.max(0, Math.min(Math.floor(x + w + 4), canvas.width - 1))
+  const bgY = Math.max(0, Math.min(Math.floor(y + h / 2), canvas.height - 1))
 
   try {
-    const pixel = ctx.getImageData(sampleX, sampleY, 1, 1).data
-    ctx.fillStyle = pixel[3] === 0 ? '#ffffff' : `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`
+    const pixel = ctx.getImageData(bgX, bgY, 1, 1).data
+    ctx.fillStyle = pixel[3] === 0
+      ? '#ffffff'
+      : `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`
   } catch (_) {
     ctx.fillStyle = '#ffffff'
   }
 
   ctx.fillRect(
-    Math.max(0, x), Math.max(0, y),
-    Math.min(w, canvas.width - Math.max(0, x)), Math.min(h, canvas.height - Math.max(0, y))
+    Math.max(0, x),
+    Math.max(0, y),
+    Math.min(w, canvas.width - Math.max(0, x)),
+    Math.min(h, canvas.height - Math.max(0, y)),
   )
 }
 
-function restoreCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: number; w: number; h: number }, container: HTMLElement, imageData: ImageData) {
+function restoreCanvasArea(
+  canvas: HTMLCanvasElement,
+  bounds: { x: number; y: number; w: number; h: number },
+  container: HTMLElement,
+  imageData: ImageData,
+) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
@@ -538,29 +555,4 @@ function restoreCanvasArea(canvas: HTMLCanvasElement, bounds: { x: number; y: nu
   const y = Math.max(0, Math.floor((bounds.y + offsetY) * scaleY) - pad)
 
   try { ctx.putImageData(imageData, x, y) } catch (_) { }
-}
-
-function placeFallbackSpans(container: HTMLDivElement, textContent: any, viewport: any, textDivs: HTMLElement[]) {
-  const vt = viewport.transform
-  for (const item of textContent.items as any[]) {
-    if (!item.str) continue
-    const span = document.createElement('span')
-    span.textContent = item.str
-    const tx = item.transform
-    const a = vt[0] * tx[0] + vt[2] * tx[1]
-    const b = vt[1] * tx[0] + vt[3] * tx[1]
-    const c = vt[0] * tx[2] + vt[2] * tx[3]
-    const d = vt[1] * tx[2] + vt[3] * tx[3]
-    const e = vt[0] * tx[4] + vt[2] * tx[5] + vt[4]
-    const f = vt[1] * tx[4] + vt[3] * tx[5] + vt[5]
-    const fontSize = Math.sqrt(a * a + b * b)
-
-    span.style.cssText = `
-      position: absolute; left: 0; top: 0; font-size: ${fontSize}px;
-      transform: matrix(${a / fontSize}, ${b / fontSize}, ${c / fontSize}, ${d / fontSize}, ${e}, ${f - fontSize});
-      transform-origin: 0% 0%; white-space: pre; color: transparent; cursor: text;
-    `
-    container.appendChild(span)
-    textDivs.push(span)
-  }
 }

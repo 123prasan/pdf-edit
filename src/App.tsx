@@ -11,6 +11,7 @@ import {
   IconPlus, IconMinus, IconMaximize, IconFile
 } from './components/Icons'
 import type { Annotation, ToolType } from './types'
+import { useExtractedText } from './hooks/useExtractedText'
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
@@ -22,6 +23,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 export default function App() {
   // ---- State ----
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null)
+  const [pdfFileObj, setPdfFileObj] = useState<File | null>(null)
   const [fileName, setFileName] = useState<string>('')
   const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
@@ -37,6 +39,23 @@ export default function App() {
   const [textEdits, setTextEdits] = useState<TextEdit[]>([])
   const [pdfPage, setPdfPage] = useState<any>(null)        // current pdf.js page object
   const [pdfViewport, setPdfViewport] = useState<any>(null) // current viewport (at scale)
+
+  const { data: extractedItems, embeddedFonts, loading: extractLoading } = useExtractedText(pdfFileObj)
+
+  // Inject embedded fonts from PDF
+  useEffect(() => {
+    if (embeddedFonts && Object.keys(embeddedFonts).length > 0) {
+      const existing = document.getElementById('pdf-embedded-fonts')
+      if (existing) existing.remove()
+      const style = document.createElement('style')
+      style.id = 'pdf-embedded-fonts'
+      style.textContent = Object.entries(embeddedFonts).map(([fontName, dataUrl]) => {
+        const cssName = fontName.replace(/^[A-Z]{6}\+/, '')
+        return `@font-face { font-family: "${cssName}"; src: url("${dataUrl}"); }`
+      }).join('\n')
+      document.head.appendChild(style)
+    }
+  }, [embeddedFonts])
 
   // Undo / Redo
   const [history, setHistory] = useState<Annotation[][]>([[]])
@@ -179,6 +198,7 @@ export default function App() {
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setPdfFileObj(file)
     const buf = await file.arrayBuffer()
     await loadPdfFromBytes(new Uint8Array(buf), file.name)
     // Reset input so same file can be re-loaded
@@ -194,6 +214,7 @@ export default function App() {
       showToast('Please drop a PDF file.')
       return
     }
+    setPdfFileObj(file)
     const buf = await file.arrayBuffer()
     await loadPdfFromBytes(new Uint8Array(buf), file.name)
   }, [loadPdfFromBytes, showToast])
@@ -236,9 +257,22 @@ export default function App() {
   }, [historyIndex])
 
   const updateAnnotation = useCallback((id: string, patch: Partial<Annotation>) => {
-    isDraggingRef.current = true
-    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a))
-  }, [])
+    setAnnotations(prev => {
+      const updated = prev.map(a => a.id === id ? { ...a, ...patch } : a)
+      // Save to history only for property changes (fontSize, fontColor, fontStyle, fontWeight, color, opacity)
+      const isPropertyChange = Object.keys(patch).some(k =>
+        ['fontSize', 'fontColor', 'fontStyle', 'fontWeight', 'color', 'opacity'].includes(k)
+      )
+      if (isPropertyChange) {
+        setHistory(h => {
+          const trimmed = h.slice(0, historyIndex + 1)
+          return [...trimmed, [...updated]]
+        })
+        setHistoryIndex(i => i + 1)
+      }
+      return updated
+    })
+  }, [historyIndex])
 
   const deleteAnnotation = useCallback((id: string) => {
     setAnnotations(prev => {
@@ -489,6 +523,7 @@ export default function App() {
                         })
                       }}
                       active={tool === 'edit'}
+                      extractedItems={extractedItems}
                     />
                   )}
                 </div>
@@ -604,7 +639,7 @@ export default function App() {
                       <input
                         type="color"
                         className="color-swatch"
-                        value={selectedAnn.fontColor || '#ffffff'}
+                        value={selectedAnn.fontColor || '#000000'}
                         onChange={(e) => {
                           updateAnnotation(selectedAnn.id, { fontColor: e.target.value })
                         }}

@@ -132,7 +132,9 @@ export default function AnnotationLayer({
         height: 60,
         text: '',
         fontSize: 14,
-        fontColor: '#ffffff',
+        fontColor: '#000000',
+        fontStyle: 'normal',
+        fontWeight: 'normal',
       }
       onAddAnnotation(newAnn)
       setEditingId(id)
@@ -255,10 +257,10 @@ export default function AnnotationLayer({
 
   const cursorStyle = tool === 'text' ? 'crosshair'
     : tool === 'highlight' ? 'crosshair'
-    : tool === 'ink' ? 'crosshair'
-    : tool === 'pan' ? 'grab'
-    : tool === 'edit' ? 'text'
-    : 'default'
+      : tool === 'ink' ? 'crosshair'
+        : tool === 'pan' ? 'grab'
+          : tool === 'edit' ? 'text'
+            : 'default'
 
   // When edit tool is active, let the TextEditLayer handle events
   const isEditMode = tool === 'edit'
@@ -319,6 +321,15 @@ export default function AnnotationLayer({
         const isEditing = editingId === ann.id
 
         if (ann.type === 'text') {
+          // Build chars array from text if not present
+          const chars = ann.chars || (ann.text ? ann.text.split('').map(char => ({
+            char,
+            fontSize: ann.fontSize || 14,
+            fontColor: ann.fontColor || '#000000',
+            fontStyle: ann.fontStyle || 'normal',
+            fontWeight: ann.fontWeight || 'normal',
+          })) : [])
+
           return (
             <div
               key={ann.id}
@@ -329,26 +340,71 @@ export default function AnnotationLayer({
                 width: ann.width,
                 height: ann.height,
                 fontSize: ann.fontSize || 14,
-                color: ann.fontColor || '#ffffff',
+                color: ann.fontColor || '#000000',
+                fontStyle: ann.fontStyle || 'normal',
+                fontWeight: ann.fontWeight || 'normal',
               }}
               onMouseDown={(e) => handleAnnotationMouseDown(e, ann)}
               onDoubleClick={() => handleDoubleClick(ann)}
             >
               {isEditing ? (
-                <textarea
-                  className="annotation-textarea"
+                <div
+                  className="annotation-contenteditable"
+                  contentEditable
+                  suppressContentEditableWarning
                   autoFocus
-                  value={ann.text ?? ''}
-                  onChange={(e) => onUpdateAnnotation(ann.id, { text: e.target.value })}
+                  onInput={(e) => {
+                    const text = e.currentTarget.innerText || ''
+                    const prevChars = ann.chars || []
+                    const lastChar = prevChars[prevChars.length - 1]
+                    const newChars = text.split('').map(char => ({
+                      char,
+                      fontSize: lastChar?.fontSize || ann.fontSize || 14,
+                      fontColor: lastChar?.fontColor || ann.fontColor || '#000000',
+                      fontStyle: lastChar?.fontStyle || ann.fontStyle || 'normal',
+                      fontWeight: lastChar?.fontWeight || ann.fontWeight || 'normal',
+                    }))
+                    onUpdateAnnotation(ann.id, { text, chars: newChars })
+                  }}
                   onBlur={() => setEditingId(null)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') setEditingId(null)
+                    if (e.key === 'Escape') {
+                      e.currentTarget.blur()
+                      setEditingId(null)
+                    }
                   }}
-                  style={{ fontSize: ann.fontSize || 14, color: ann.fontColor || '#ffffff' }}
+                  style={{
+                    fontSize: ann.fontSize || 14,
+                    color: ann.fontColor || '#000000',
+                    fontStyle: ann.fontStyle || 'normal',
+                    fontWeight: ann.fontWeight || 'normal',
+                  }}
                 />
               ) : (
-                <div className="annotation-text-display" style={{ fontSize: ann.fontSize || 14 }}>
-                  {ann.text || 'Double-click to edit'}
+                <div className="annotation-text-display" style={{
+                  fontSize: ann.fontSize || 14,
+                  color: ann.fontColor || '#000000',
+                  fontStyle: ann.fontStyle || 'normal',
+                  fontWeight: ann.fontWeight || 'normal',
+                }}>
+                  {chars.length > 0 ? (
+                    chars.map((c, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: c.fontSize,
+                          color: c.fontColor,
+                          fontStyle: c.fontStyle,
+                          fontWeight: c.fontWeight,
+                          display: 'inline',
+                        }}
+                      >
+                        {c.char === '\n' ? <br /> : c.char}
+                      </span>
+                    ))
+                  ) : (
+                    <span>Double-click to edit</span>
+                  )}
                 </div>
               )}
               {(isSelected || true) && (

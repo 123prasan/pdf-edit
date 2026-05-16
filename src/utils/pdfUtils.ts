@@ -97,24 +97,57 @@ export async function exportPdfWithAnnotations(
     const toLen = (cl: number) => cl / canvasScale
 
     if (ann.type === 'text' && ann.text) {
-      const fontSize = (ann.fontSize || 14) / canvasScale
-      const col = hexToRgb(ann.fontColor || '#000000')
       const x = toX(ann.x)
-      const y = toY(ann.y) - fontSize
+      const baseY = toY(ann.y)
 
-      const lines = ann.text.split('\n')
-      lines.forEach((line, i) => {
-        if (!line) return
-        try {
-          page.drawText(line, {
-            x,
-            y: y - i * (fontSize * 1.3),
-            size: Math.max(fontSize, 1),
-            font: helvetica,
-            color: rgb(col.r, col.g, col.b),
-          })
-        } catch (_) {}
-      })
+      // If we have character-level styling, draw each character with its own style
+      if (ann.chars && ann.chars.length > 0) {
+        let currentX = x
+        let currentY = baseY
+        const firstCharFontSize = (ann.chars[0]?.fontSize || 14) / canvasScale
+        currentY -= firstCharFontSize
+
+        for (const charStyle of ann.chars) {
+          if (charStyle.char === '\n') {
+            currentX = x
+            const charFontSize = (charStyle.fontSize || 14) / canvasScale
+            currentY -= charFontSize * 1.3
+            continue
+          }
+
+          const charFontSize = (charStyle.fontSize || 14) / canvasScale
+          const charCol = hexToRgb(charStyle.fontColor || '#000000')
+
+          try {
+            page.drawText(charStyle.char, {
+              x: currentX,
+              y: currentY,
+              size: Math.max(charFontSize, 1),
+              font: helvetica,
+              color: rgb(charCol.r, charCol.g, charCol.b),
+            })
+            // Approximate character width for next position
+            currentX += charFontSize * 0.5
+          } catch (_) {}
+        }
+      } else {
+        // Fallback to original behavior for backward compatibility
+        const fontSize = (ann.fontSize || 14) / canvasScale
+        const col = hexToRgb(ann.fontColor || '#000000')
+        const lines = ann.text.split('\n')
+        lines.forEach((line, i) => {
+          if (!line) return
+          try {
+            page.drawText(line, {
+              x,
+              y: baseY - i * (fontSize * 1.3) - fontSize,
+              size: Math.max(fontSize, 1),
+              font: helvetica,
+              color: rgb(col.r, col.g, col.b),
+            })
+          } catch (_) {}
+        })
+      }
 
     } else if (ann.type === 'highlight') {
       const col = hexToRgb(ann.color || '#fbbf24')

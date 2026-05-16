@@ -584,23 +584,33 @@ select.input-sm {
 }
 
 .annotation-text-box {
-  border: 1px solid rgba(129, 140, 248, 0.3);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 3px;
-  padding: 4px 6px;
-  backdrop-filter: blur(4px);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 4px;
+  padding: 6px 8px;
+  backdrop-filter: blur(2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif !important;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
 }
 
 .annotation-text-box.editing {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
 .annotation-text-display {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: 1.5;
   user-select: none;
+  padding: 2px 0;
+  overflow: hidden;
 }
 
 .annotation-textarea {
@@ -610,11 +620,56 @@ select.input-sm {
   border: none;
   outline: none;
   background: transparent;
-  color: inherit;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: 1.4;
-  padding: 0;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  line-height: 1.5 !important;
+  padding: 2px 0;
+  margin: 0;
+  box-sizing: border-box;
+  letter-spacing: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+
+/* Force textarea to respect inline color styles */
+.annotation-textarea[style*="color"] {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+
+/* Contenteditable div for character-level text editing */
+.annotation-contenteditable {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  color: inherit !important;
+  line-height: 1.5 !important;
+  padding: 2px 0;
+  margin: 0;
+  box-sizing: border-box;
+  letter-spacing: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: hidden;
+}
+
+.annotation-contenteditable:focus {
+  outline: none;
+}
+
+.annotation-contenteditable:empty:before {
+  content: attr(placeholder);
+  color: #999;
 }
 
 .annotation-highlight {
