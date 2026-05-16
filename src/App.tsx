@@ -338,7 +338,8 @@ export default function App() {
       formData.append('textEdits', JSON.stringify(textEdits))
       formData.append('scale', scale.toString())
 
-      const res = await fetch('http://localhost:8000/export', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${API_URL}/export`, {
         method: 'POST',
         body: formData
       })
