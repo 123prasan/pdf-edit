@@ -22,7 +22,7 @@ declare global {
   interface Window { adsbygoogle: any[] }
 }
 
-function AdSlot({ format = 'auto', slot, className = '' }: { format?: string; slot: string; className?: string }) {
+function AdSlot({ format = 'auto', slot, className = '', layoutKey }: { format?: string; slot: string; className?: string; layoutKey?: string }) {
   const adRef = React.useRef<HTMLDivElement>(null)
   const pushed = React.useRef(false)
   React.useEffect(() => {
@@ -40,6 +40,7 @@ function AdSlot({ format = 'auto', slot, className = '' }: { format?: string; sl
         data-ad-slot={slot}
         data-ad-format={format}
         data-full-width-responsive="true"
+        {...(layoutKey ? { 'data-ad-layout-key': layoutKey } : {})}
       />
     </div>
   )
@@ -67,7 +68,7 @@ function ExportInterstitial({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <div className="interstitial-ad">
-          <AdSlot slot="INTERSTITIAL_SLOT_ID" format="rectangle" className="ad-interstitial" />
+          <AdSlot slot="8578929833" format="rectangle" className="ad-interstitial" />
         </div>
         <p className="interstitial-hint">Your edited PDF has been downloaded</p>
       </div>
@@ -789,7 +790,7 @@ export default function App() {
             </div>
 
             {/* Ad: In-feed native between features and trust */}
-            <AdSlot slot="LANDING_INFEED_SLOT_ID" format="fluid" className="ad-landing-infeed" />
+            <AdSlot slot="4531873612" format="fluid" className="ad-landing-infeed" layoutKey="-fb+5w+4e-db+86" />
 
             <div className="trust-section">
               <div className="trust-item"><strong>100%</strong><span>Browser-based</span></div>
@@ -802,7 +803,7 @@ export default function App() {
             </div>
 
             {/* Ad: Banner above footer */}
-            <AdSlot slot="LANDING_BANNER_SLOT_ID" format="auto" className="ad-landing-banner" />
+            <AdSlot slot="8279546939" format="auto" className="ad-landing-banner" />
 
             <footer className="landing-footer">
               <p>Built with care · Your files never leave your browser</p>
