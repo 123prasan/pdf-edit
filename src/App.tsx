@@ -437,15 +437,19 @@ export default function App() {
       })
       if (!res.ok) throw new Error('Server export failed')
 
-      const exportedBlob = await res.blob()
+      const exportedBlob = new Blob([await res.blob()], { type: 'application/pdf' })
       const url = URL.createObjectURL(exportedBlob)
       const a = document.createElement('a')
       a.href = url
       a.download = fileName ? fileName.replace(/\.pdf$/i, '_edited.pdf') : 'edited.pdf'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      // Delay revoking so download has time to start
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
       showToast('PDF exported securely with pixel-perfect accuracy!')
-      setShowInterstitial(true) // Show ad interstitial after export
+      // Show interstitial after a brief delay so download isn't blocked
+      setTimeout(() => setShowInterstitial(true), 500)
     } catch (err) {
       console.error(err)
       showToast('Export failed. Make sure server is running.')
