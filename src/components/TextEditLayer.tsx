@@ -410,15 +410,16 @@ export default function TextEditLayer({
       const spanRect = span.getBoundingClientRect()
       if (!containerRect) return
 
+      const pad = 15
       setEditingItem({
         idx,
         text: existingEdit.newText,
         originalText: '',
         bounds: {
-          x: spanRect.left - containerRect.left,
-          y: spanRect.top - containerRect.top,
-          w: spanRect.width,
-          h: spanRect.height,
+          x: (spanRect.left - containerRect.left) + pad,
+          y: (spanRect.top - containerRect.top) + pad,
+          w: spanRect.width - (pad * 2),
+          h: spanRect.height - (pad * 2),
         },
         fontSize: existingEdit.fontSize,
         fontFamily: existingEdit.fontFamily,
@@ -443,11 +444,12 @@ export default function TextEditLayer({
     const spanRect = span.getBoundingClientRect()
     if (!containerRect) return
 
+    const pad = 15
     const bounds = {
-      x: spanRect.left - containerRect.left,
-      y: spanRect.top - containerRect.top,
-      w: spanRect.width,
-      h: spanRect.height,
+      x: (spanRect.left - containerRect.left) + pad,
+      y: (spanRect.top - containerRect.top) + pad,
+      w: spanRect.width - (pad * 2),
+      h: spanRect.height - (pad * 2),
     }
 
     if (!isEditedDiv) {
