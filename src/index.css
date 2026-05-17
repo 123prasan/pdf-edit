@@ -710,6 +710,27 @@ select.input-sm {
   pointer-events: none;
 }
 
+.hero-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  width: 100%;
+  animation: fadeInUp 0.5s var(--ease-out) 0.4s both;
+}
+
+.drop-card-illustration {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(79, 70, 229, 0.15));
+  transition: transform 0.4s var(--ease-spring);
+}
+
+.drop-card:hover .drop-card-illustration {
+  transform: scale(1.1) rotate(-3deg);
+}
+
 .drop-card {
   display: flex;
   flex-direction: column;

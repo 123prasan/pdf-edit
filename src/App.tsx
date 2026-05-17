@@ -703,10 +703,12 @@ export default function App() {
 
             <img src="/hero-illustration.svg" alt="Edit documents online" className="hero-illustration" />
 
-            <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
-              <div className="drop-icon"><IconUpload /></div>
-              <div className="drop-title">Drop your PDF here</div>
-              <div className="drop-subtitle">or click to browse files · Max 50MB</div>
+            <div className="hero-upload-row">
+              <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
+                <img src="/OIP.webp" alt="PDF" className="drop-card-illustration" />
+                <div className="drop-title">Drop your PDF here</div>
+                <div className="drop-subtitle">or click to browse files · Max 50MB</div>
+              </div>
             </div>
 
             <div className="feature-grid">
