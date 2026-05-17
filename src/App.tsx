@@ -15,6 +15,29 @@ import { useExtractedText } from './hooks/useExtractedText'
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
 
 /* ============================================================
+   PdfLoadingStep — animated step indicator used in loading overlay
+   ============================================================ */
+function PdfLoadingStep({ text, delay }: { text: string; delay: number }) {
+  const [active, setActive] = React.useState(false)
+  React.useEffect(() => {
+    const t = setTimeout(() => setActive(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  return (
+    <div className={`pdf-loading-step ${active ? 'active' : ''}`}>
+      <div className="pdf-loading-step-dot">
+        {active && (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+      <span>{text}</span>
+    </div>
+  )
+}
+
+/* ============================================================
    PDF Studio — Enterprise PDF Editor
    ============================================================ */
 
@@ -483,10 +506,30 @@ export default function App() {
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      {/* Loading overlay */}
-      {loading && (
-        <div className="loading-overlay">
-          <div className="spinner" />
+      {/* PDF Loading Overlay — shown while server extracts text */}
+      {(loading || extractLoading) && pdfBytes && (
+        <div className="pdf-loading-overlay">
+          <div className="pdf-loading-card">
+            <div className="pdf-loading-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <div className="pdf-loading-title">Processing PDF</div>
+            <div className="pdf-loading-filename">{fileName || 'document.pdf'}</div>
+            <div className="pdf-loading-bar-wrap">
+              <div className="pdf-loading-bar" />
+            </div>
+            <div className="pdf-loading-steps">
+              <PdfLoadingStep delay={0} text="Uploading document" />
+              <PdfLoadingStep delay={1200} text="Extracting text & fonts" />
+              <PdfLoadingStep delay={2800} text="Mapping coordinates" />
+              <PdfLoadingStep delay={4200} text="Preparing editor" />
+            </div>
+          </div>
         </div>
       )}
 
