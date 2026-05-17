@@ -49,28 +49,43 @@ function AdSlot({ format = 'auto', slot, className = '', layoutKey }: { format?:
 /* ============================================================
    ExportInterstitial — 5-second fullscreen ad after export
    ============================================================ */
-function ExportInterstitial({ onClose }: { onClose: () => void }) {
+function ExportInterstitial({ onClose, pendingDownload }: { onClose: () => void, pendingDownload: { url: string, filename: string } | null }) {
   const [countdown, setCountdown] = React.useState(5)
+  const hasDownloaded = React.useRef(false)
+
   React.useEffect(() => {
-    if (countdown <= 0) return
-    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
-    return () => clearTimeout(t)
-  }, [countdown])
+    if (countdown > 0) {
+      const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+      return () => clearTimeout(t)
+    } else if (!hasDownloaded.current && pendingDownload) {
+      // Countdown finished! Trigger the download now
+      const a = document.createElement('a')
+      a.href = pendingDownload.url
+      a.download = pendingDownload.filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      hasDownloaded.current = true
+    }
+  }, [countdown, pendingDownload])
+
   return (
     <div className="interstitial-overlay">
       <div className="interstitial-card">
         <div className="interstitial-header">
-          <span className="interstitial-badge">✓ PDF Exported Successfully!</span>
+          <span className="interstitial-badge">✓ PDF Ready!</span>
           {countdown <= 0 ? (
             <button className="btn-primary interstitial-close" onClick={onClose}>Continue Editing</button>
           ) : (
-            <span className="interstitial-timer">Continue in {countdown}s</span>
+            <span className="interstitial-timer">Downloading in {countdown}s</span>
           )}
         </div>
         <div className="interstitial-ad">
           <AdSlot slot="8578929833" format="rectangle" className="ad-interstitial" />
         </div>
-        <p className="interstitial-hint">Your edited PDF has been downloaded</p>
+        <p className="interstitial-hint">
+          {countdown <= 0 ? "Your edited PDF has been downloaded." : "Please wait while we prepare your file..."}
+        </p>
       </div>
     </div>
   )
@@ -435,21 +450,25 @@ export default function App() {
         method: 'POST',
         body: formData
       })
-      if (!res.ok) throw new Error('Server export failed')
+      if (!res.ok) throw new Error(`Server export failed: ${res.statusText}`)
+
+      const contentType = res.headers.get('content-type')
+      if (contentType && contentType.includes('text/html')) {
+        const text = await res.text()
+        console.error("Received HTML instead of PDF:", text)
+        throw new Error("Server returned HTML. Ensure backend URL is correct.")
+      }
 
       const exportedBlob = new Blob([await res.blob()], { type: 'application/pdf' })
       const url = URL.createObjectURL(exportedBlob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName ? fileName.replace(/\.pdf$/i, '_edited.pdf') : 'edited.pdf'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      // Delay revoking so download has time to start
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      const filename = fileName ? fileName.replace(/\.pdf$/i, '_edited.pdf') : 'edited.pdf'
+
+      // Delay revoking so download has time to start (handled in interstitial now)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      
+      // Show interstitial which handles the download
+      setPendingDownload({ url, filename })
       showToast('PDF exported securely with pixel-perfect accuracy!')
-      // Show interstitial after a brief delay so download isn't blocked
-      setTimeout(() => setShowInterstitial(true), 500)
     } catch (err) {
       console.error(err)
       showToast('Export failed. Make sure server is running.')
@@ -605,8 +624,8 @@ export default function App() {
       <div className={`toast ${toastMsg ? 'show' : ''}`}>{toastMsg}</div>
 
       {/* Post-export interstitial ad */}
-      {showInterstitial && (
-        <ExportInterstitial onClose={() => setShowInterstitial(false)} />
+      {pendingDownload && (
+        <ExportInterstitial pendingDownload={pendingDownload} onClose={() => setPendingDownload(null)} />
       )}
 
       {/* Hidden file input */}
