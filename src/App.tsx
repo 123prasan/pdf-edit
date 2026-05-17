@@ -28,7 +28,7 @@ function PdfLoadingStep({ text, delay }: { text: string; delay: number }) {
       <div className="pdf-loading-step-dot">
         {active && (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </div>
@@ -162,7 +162,7 @@ export default function App() {
   // ---- Warm up the server on app load (prevents Render cold-start delay) ----
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    fetch(`${API_URL}/health`).catch(() => {/* silently ignore */})
+    fetch(`${API_URL}/health`).catch(() => {/* silently ignore */ })
   }, [])
 
   // ---- Toast helper ----
@@ -367,7 +367,7 @@ export default function App() {
       formData.append('textEdits', JSON.stringify(textEdits))
       formData.append('scale', scale.toString())
 
-      const API_URL = import.meta.env.VITE_API_URL || 'https://pdfstudiio.onrender.com/'
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       const res = await fetch(`${API_URL}/export`, {
         method: 'POST',
         body: formData
@@ -512,10 +512,10 @@ export default function App() {
           <div className="pdf-loading-card">
             <div className="pdf-loading-icon">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
             </div>
             <div className="pdf-loading-title">Processing PDF</div>
@@ -706,20 +706,31 @@ export default function App() {
           {!pdfBytes ? (
             /* Welcome / Drop Zone */
             <div className="welcome-zone">
-              <div
-                className={`drop-card ${dragOver ? 'drag-over' : ''}`}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="drop-icon">
-                  <IconFile />
+              <div className="hero-section">
+                <div className="hero-badge">Free · No Signup · No Watermarks</div>
+                <h1 className="hero-title">The PDF Editor<br /><span className="hero-gradient">Built for Everyone</span></h1>
+                <p className="hero-subtitle">Edit text, add shapes, highlight, annotate, and export pixel-perfect PDFs — all in your browser.</p>
+                <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
+                  <div className="drop-icon"><IconUpload /></div>
+                  <div className="drop-title">Drop your PDF here</div>
+                  <div className="drop-subtitle">or click to browse files</div>
                 </div>
-                <div className="drop-title">Open a PDF to get started</div>
-                <div className="drop-subtitle">
-                  Drag & drop a PDF file here, or click to browse.<br />
-                  Add text, highlights, freehand drawings, then export.
+                <div className="feature-grid">
+                  <div className="feature-card"><div className="feature-icon fi-indigo"><IconEdit /></div><h3>Edit Text</h3><p>Click any text to edit in-place</p></div>
+                  <div className="feature-card"><div className="feature-icon fi-sky"><IconSquare /></div><h3>Shapes</h3><p>Rectangles, circles, and lines</p></div>
+                  <div className="feature-card"><div className="feature-icon fi-amber"><IconHighlighter /></div><h3>Highlight</h3><p>Mark passages with any color</p></div>
+                  <div className="feature-card"><div className="feature-icon fi-emerald"><IconPen /></div><h3>Freehand</h3><p>Draw annotations and signatures</p></div>
+                  <div className="feature-card"><div className="feature-icon fi-violet"><IconType /></div><h3>Add Text</h3><p>Place text boxes anywhere</p></div>
+                  <div className="feature-card"><div className="feature-icon fi-rose"><IconDownload /></div><h3>Export</h3><p>Download with all edits baked in</p></div>
                 </div>
-                <div className="drop-badge">
-                  <IconUpload /> Supports any PDF file
+                <div className="trust-section">
+                  <div className="trust-item"><strong>100%</strong><span>Browser-based</span></div>
+                  <div className="trust-divider" />
+                  <div className="trust-item"><strong>0</strong><span>Watermarks</span></div>
+                  <div className="trust-divider" />
+                  <div className="trust-item"><strong>Free</strong><span>Forever</span></div>
+                  <div className="trust-divider" />
+                  <div className="trust-item"><strong>Secure</strong><span>Files stay private</span></div>
                 </div>
               </div>
             </div>

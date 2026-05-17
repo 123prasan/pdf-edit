@@ -534,43 +534,95 @@ select.input-sm {
 }
 
 /* ============================================================
-   Welcome / Drop Zone
+   Welcome / Drop Zone + Enterprise Landing Page
    ============================================================ */
 .welcome-zone {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 40px 24px;
+  overflow-y: auto;
+}
+
+.hero-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 28px;
+  max-width: 800px;
+  width: 100%;
+  animation: fadeInUp 0.6s var(--ease-out);
+}
+
+.hero-badge {
+  display: inline-flex;
+  padding: 6px 18px;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  animation: fadeInUp 0.5s var(--ease-out) 0.1s both;
+}
+
+.hero-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  margin: 0;
+  animation: fadeInUp 0.5s var(--ease-out) 0.2s both;
+}
+
+.hero-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: clamp(15px, 2vw, 18px);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 540px;
+  margin: 0;
+  animation: fadeInUp 0.5s var(--ease-out) 0.3s both;
 }
 
 .drop-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: 60px 80px;
+  gap: 16px;
+  padding: 48px 64px;
   border: 2px dashed var(--border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--bg-secondary);
   cursor: pointer;
-  transition: all 0.2s var(--ease-out);
+  transition: all 0.3s var(--ease-spring);
   text-align: center;
-  max-width: 520px;
+  width: 100%;
+  max-width: 480px;
   box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.5s var(--ease-out) 0.4s both;
 }
 
 .drop-card:hover {
   border-color: var(--accent);
-  background: var(--bg-hover);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  background: rgba(79, 70, 229, 0.02);
+  box-shadow: var(--shadow-md), 0 0 0 4px rgba(79, 70, 229, 0.06);
+  transform: translateY(-4px);
 }
 
 .drop-card.drag-over {
   border-color: var(--accent-bright);
-  background: var(--bg-hover);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 0 0 6px rgba(79, 70, 229, 0.1);
   transform: scale(1.02);
 }
 
@@ -581,31 +633,21 @@ select.input-sm {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-muted), var(--accent));
+  background: var(--accent-gradient);
   color: #fff;
-  box-shadow: var(--shadow-glow);
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
   animation: float 3s ease-in-out infinite;
 }
 
-.drop-icon svg {
-  width: 28px;
-  height: 28px;
-}
+.drop-icon svg { width: 28px; height: 28px; }
 
 @keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-6px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .drop-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
@@ -616,6 +658,72 @@ select.input-sm {
   color: var(--text-muted);
   line-height: 1.6;
 }
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+  animation: fadeInUp 0.5s var(--ease-out) 0.6s both;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  transition: all 0.3s var(--ease-spring);
+  cursor: default;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-hover);
+}
+
+.feature-card h3 { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.feature-card p { font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.5; }
+
+.feature-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.feature-icon svg { width: 20px; height: 20px; }
+.fi-indigo  { background: linear-gradient(135deg, #4f46e5, #818cf8); }
+.fi-sky     { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
+.fi-amber   { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+.fi-emerald { background: linear-gradient(135deg, #10b981, #34d399); }
+.fi-violet  { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+.fi-rose    { background: linear-gradient(135deg, #ef4444, #f87171); }
+
+.trust-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px 32px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  animation: fadeInUp 0.5s var(--ease-out) 0.8s both;
+}
+
+.trust-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.trust-item strong { font-size: 18px; font-weight: 700; color: var(--text-primary); font-family: 'Outfit', sans-serif; }
+.trust-item span { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+.trust-divider { width: 1px; height: 32px; background: var(--border-default); }
 
 .drop-badge {
   display: inline-flex;
@@ -1034,6 +1142,29 @@ select.input-sm {
   
   .toolbar-strip::-webkit-scrollbar {
     display: none;
+  }
+
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .feature-card {
+    padding: 16px 10px;
+  }
+
+  .trust-section {
+    gap: 14px;
+    padding: 14px 16px;
+    flex-wrap: wrap;
+  }
+
+  .trust-item strong {
+    font-size: 15px;
+  }
+
+  .hero-section {
+    gap: 20px;
   }
 }
 
