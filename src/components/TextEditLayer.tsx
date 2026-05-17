@@ -347,11 +347,13 @@ export default function TextEditLayer({
       const spanRect = d.span.getBoundingClientRect()
       if (!containerRect || (!rawItem && d.idx >= 0)) return
 
+      // Account for the 15px invisible padding we added for mobile touch targets
+      const pad = 15
       const newBounds = {
-        x: spanRect.left - containerRect.left,
-        y: spanRect.top - containerRect.top,
-        w: spanRect.width,
-        h: spanRect.height,
+        x: (spanRect.left - containerRect.left) + pad,
+        y: (spanRect.top - containerRect.top) + pad,
+        w: spanRect.width - (pad * 2),
+        h: spanRect.height - (pad * 2),
       }
 
       const scaleX = canvasWidth / (rawItem?.pageWidth || canvasWidth)
