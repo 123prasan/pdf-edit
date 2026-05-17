@@ -254,11 +254,11 @@ export default function TextEditLayer({
         idx: newIdx,
         originalText: '',
         text: '',
-        bounds: { 
-          x: Math.max(0, Math.min(px, canvasWidth - 100)), 
-          y: Math.max(0, Math.min(py, canvasHeight - 20)), 
-          w: 100, 
-          h: 20 
+        bounds: {
+          x: Math.max(0, Math.min(px, canvasWidth - 100)),
+          y: Math.max(0, Math.min(py, canvasHeight - 20)),
+          w: 100,
+          h: 20
         },
         fontSize: 16,
         fontFamily: activeFont ? `"${activeFont}", sans-serif` : 'sans-serif',
@@ -309,13 +309,13 @@ export default function TextEditLayer({
 
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
       d.moved = true
-      
+
       let newLeft = d.spanLeft + dx
       let newTop = d.spanTop + dy
-      
+
       const spanW = d.span.offsetWidth || 0
       const spanH = d.span.offsetHeight || 0
-      
+
       newLeft = Math.max(0, Math.min(newLeft, canvasWidth - spanW))
       newTop = Math.max(0, Math.min(newTop, canvasHeight - spanH))
 
@@ -548,7 +548,8 @@ export default function TextEditLayer({
       style={{
         position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight,
         zIndex: active ? 15 : 3, pointerEvents: active ? 'auto' : 'none',
-        touchAction: 'none'
+        touchAction: 'none',
+        cursor: tool === 'text' ? 'text' : (active ? 'default' : 'auto')
       }}
       onDoubleClick={handleDoubleClick}
       onPointerDown={handlePointerDown}
@@ -612,15 +613,15 @@ export default function TextEditLayer({
           <div
             className="text-edit-toolbar"
             style={{
-              '--menu-left': `${Math.max(0, Math.min(editingItem.bounds.x, canvasWidth - 340))}px`,
-              '--menu-top': `${editingItem.bounds.y > 50 ? editingItem.bounds.y - 50 : editingItem.bounds.y + editingItem.bounds.h + 10}px`,
+              '--menu-left': `${Math.max(0, Math.min(editingItem.bounds.x, canvasWidth - 260))}px`,
+              '--menu-top': `${editingItem.bounds.y > 40 ? editingItem.bounds.y - 36 : editingItem.bounds.y + editingItem.bounds.h + 6}px`,
             } as React.CSSProperties}
           >
             <select
               value={editingItem.fontFamily.split(',')[0].replace(/['"]/g, '').trim()}
               onChange={(e) => setEditingItem({ ...editingItem, fontFamily: `"${e.target.value}", sans-serif` })}
             >
-              <option value="">Default Font</option>
+              <option value="">Font</option>
               <optgroup label="Document Fonts">
                 {docFonts.map(f => <option key={f} value={f}>{f}</option>)}
               </optgroup>
@@ -636,7 +637,7 @@ export default function TextEditLayer({
 
             <input
               type="number"
-              style={{ width: 50, textAlign: 'center' }}
+              style={{ width: 38, textAlign: 'center' }}
               value={Math.round(editingItem.fontSize)}
               onChange={(e) => setEditingItem({ ...editingItem, fontSize: Number(e.target.value) || 12 })}
               title="Font Size"
@@ -644,13 +645,13 @@ export default function TextEditLayer({
 
             <input
               type="color"
-              style={{ width: 28, height: 28, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '50%' }}
+              style={{ width: 22, height: 22, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '50%', flexShrink: 0 }}
               value={editingItem.color}
               onChange={(e) => setEditingItem({ ...editingItem, color: e.target.value })}
               title="Text Color"
             />
 
-            <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
+            <div className="toolbar-sep" />
 
             <button
               className={`text-edit-btn ${editingItem.fontWeight === 'bold' ? 'active' : ''}`}
@@ -669,13 +670,13 @@ export default function TextEditLayer({
               I
             </button>
 
-            <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
+            <div className="toolbar-sep" />
 
             <button
               className="text-edit-btn"
-              style={{ color: 'var(--danger)', fontSize: 16 }}
+              style={{ color: 'var(--danger)' }}
               onClick={() => {
-                setEditingItem({ ...editingItem, text: '' }) // Clearing text effectively deletes it
+                setEditingItem({ ...editingItem, text: '' })
                 setTimeout(commitEdit, 0)
               }}
               title="Delete text"
