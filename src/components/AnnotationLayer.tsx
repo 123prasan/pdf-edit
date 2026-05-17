@@ -46,6 +46,8 @@ export default function AnnotationLayer({
     startY: number
     origX: number
     origY: number
+    width: number
+    height: number
   } | null>(null)
 
   // Resize state
@@ -68,32 +70,36 @@ export default function AnnotationLayer({
     path: Point[]
   } | null>(null)
 
-  // ---- Coordinate helpers ----
   // Returns coordinates in canvas-pixel space (matching canvas dimensions).
   // Since the layer is the same pixel size as the canvas, no scale conversion needed.
   const getLocalCoords = useCallback((e: React.MouseEvent | MouseEvent): Point => {
     const rect = layerRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
-    // The layer is rendered at canvasWidth x canvasHeight pixels on screen,
-    // so client coords map directly to canvas pixels
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    }
-  }, [])
+    
+    // Clamp coordinates to ensure drawings never go outside the PDF bounds
+    const x = Math.max(0, Math.min(e.clientX - rect.left, canvasWidth))
+    const y = Math.max(0, Math.min(e.clientY - rect.top, canvasHeight))
+    
+    return { x, y }
+  }, [canvasWidth, canvasHeight])
 
   // ---- Global mouse handlers (drag / resize) ----
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (dragRef.current) {
-        const { id, startX, startY, origX, origY } = dragRef.current
+        const { id, startX, startY, origX, origY, width, height } = dragRef.current
         const dx = e.clientX - startX
         const dy = e.clientY - startY
         
         let newX = origX + dx
         let newY = origY + dy
-        newX = Math.max(0, Math.min(newX, canvasWidth - 20)) // 20px padding
-        newY = Math.max(0, Math.min(newY, canvasHeight - 20))
+        
+        // Use actual shape dimensions to prevent any part from crossing the edge.
+        // Add slight padding to ensure delete/resize buttons don't clip off either.
+        const clampW = width || 0
+        const clampH = height || 0
+        newX = Math.max(0, Math.min(newX, canvasWidth - clampW - 10))
+        newY = Math.max(0, Math.min(newY, canvasHeight - clampH - 10))
         
         onUpdateAnnotation(id, { x: newX, y: newY })
       }
@@ -264,12 +270,19 @@ export default function AnnotationLayer({
     if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') return
 
     onSelectAnnotation(ann.id)
+    
+    // For lines, width is max(abs(x2-x)), for others it's just ann.width
+    const effectiveWidth = ann.type === 'line' ? Math.max(Math.abs((ann.x2 || 0) - ann.x), 2) : ann.width
+    const effectiveHeight = ann.type === 'line' ? Math.max(Math.abs((ann.y2 || 0) - ann.y), 2) : ann.height
+
     dragRef.current = {
       id: ann.id,
       startX: e.clientX,
       startY: e.clientY,
       origX: ann.x,
       origY: ann.y,
+      width: effectiveWidth,
+      height: effectiveHeight
     }
     e.stopPropagation()
     e.preventDefault()

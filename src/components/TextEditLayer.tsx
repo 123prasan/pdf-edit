@@ -254,7 +254,12 @@ export default function TextEditLayer({
         idx: newIdx,
         originalText: '',
         text: '',
-        bounds: { x: px, y: py, w: 100, h: 20 },
+        bounds: { 
+          x: Math.max(0, Math.min(px, canvasWidth - 100)), 
+          y: Math.max(0, Math.min(py, canvasHeight - 20)), 
+          w: 100, 
+          h: 20 
+        },
         fontSize: 16,
         fontFamily: activeFont ? `"${activeFont}", sans-serif` : 'sans-serif',
         fontWeight: 'normal',
@@ -607,8 +612,8 @@ export default function TextEditLayer({
           <div
             className="text-edit-toolbar"
             style={{
-              '--menu-left': `${Math.max(0, editingItem.bounds.x)}px`,
-              '--menu-top': `${editingItem.bounds.y - 50}px`,
+              '--menu-left': `${Math.max(0, Math.min(editingItem.bounds.x, canvasWidth - 340))}px`,
+              '--menu-top': `${editingItem.bounds.y > 50 ? editingItem.bounds.y - 50 : editingItem.bounds.y + editingItem.bounds.h + 10}px`,
             } as React.CSSProperties}
           >
             <select
