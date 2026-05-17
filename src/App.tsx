@@ -433,7 +433,7 @@ export default function App() {
   // ---- Export ----
   const handleExport = useCallback(async () => {
     const bytes = pdfBytesRef.current
-    if (!bytes || !pdfFileObj) {
+    if (!bytes) {
       showToast('No PDF file loaded.')
       return
     }
@@ -441,7 +441,10 @@ export default function App() {
     showToast('Applying high-fidelity edits on server... Please wait.')
     try {
       const formData = new FormData()
-      formData.append('file', pdfFileObj)
+      // Use the current in-memory bytes (which includes any inserted/deleted pages)
+      // instead of the original uploaded file
+      const currentBlob = new Blob([bytes], { type: 'application/pdf' })
+      formData.append('file', currentBlob, fileName || 'document.pdf')
       formData.append('annotations', JSON.stringify(annotations))
       formData.append('textEdits', JSON.stringify(textEdits))
       formData.append('scale', scale.toString())
@@ -476,7 +479,7 @@ export default function App() {
     } finally {
       setIsExporting(false)
     }
-  }, [annotations, textEdits, scale, fileName, showToast, pdfFileObj])
+  }, [annotations, textEdits, scale, fileName, showToast])
 
   // ---- Annotation CRUD ----
   const addAnnotation = useCallback((ann: Annotation) => {
