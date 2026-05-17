@@ -17,6 +17,11 @@ export type ExtractedTextItem = {
   pageHeight: number;
 };
 
+/* ------------------------------------------------------------------ *
+ *  Two-phase extraction hook                                          *
+ *  Phase 1: /extract-text (fast — text + colors, NO fonts)            *
+ *  Phase 2: /extract-fonts (lazy background — embedded fonts only)    *
+ * ------------------------------------------------------------------ */
 export function useExtractedText(pdfFile: File | null) {
   const [data, setData] = useState<Record<number, ExtractedTextItem[]>>({});
   const [embeddedFonts, setEmbeddedFonts] = useState<Record<string, string>>({});
@@ -34,12 +39,17 @@ export function useExtractedText(pdfFile: File | null) {
     setLoading(true);
     setError(null);
 
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+    /* ============================================================
+       PHASE 1: Get text data instantly (no embedded fonts)
+       Editor overlay appears as soon as this completes
+       ============================================================ */
     const extractText = async () => {
       try {
         const formData = new FormData();
         formData.append('file', pdfFile);
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
         const res = await fetch(`${API_URL}/extract-text`, {
           method: 'POST',
           body: formData,
@@ -51,7 +61,6 @@ export function useExtractedText(pdfFile: File | null) {
 
         const json = await res.json();
         if (isMounted) {
-          // Parse the pages object, keys are stringified page numbers
           const parsedData: Record<number, ExtractedTextItem[]> = {};
           if (json.pages) {
             for (const key of Object.keys(json.pages)) {
@@ -59,10 +68,7 @@ export function useExtractedText(pdfFile: File | null) {
             }
           }
           setData(parsedData);
-          if (json.embeddedFonts) {
-            setEmbeddedFonts(json.embeddedFonts);
-          }
-          setLoading(false);
+          setLoading(false); // Editor is READY — overlay renders now
         }
       } catch (err: any) {
         if (isMounted) {
@@ -72,12 +78,41 @@ export function useExtractedText(pdfFile: File | null) {
       }
     };
 
-    extractText();
+    /* ============================================================
+       PHASE 2: Fetch embedded fonts in background (non-blocking)
+       Silently injects @font-face rules for pixel-perfect rendering
+       If it fails, fallback CSS fonts still look great
+       ============================================================ */
+    const extractFonts = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', pdfFile);
+
+        const res = await fetch(`${API_URL}/extract-fonts`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) return; // Silently fail
+
+        const json = await res.json();
+        if (isMounted && json.embeddedFonts) {
+          setEmbeddedFonts(json.embeddedFonts);
+        }
+      } catch {
+        // Server slow or unreachable — CSS fallback fonts work fine
+      }
+    };
+
+    // Fire Phase 1 first, then Phase 2 in background
+    extractText().then(() => {
+      if (isMounted) extractFonts();
+    });
 
     return () => {
       isMounted = false;
     };
   }, [pdfFile]);
-  //
+
   return { data, embeddedFonts, loading, error };
 }
