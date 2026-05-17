@@ -496,11 +496,15 @@ export default function App() {
         } else if (ann.type === 'ink') {
           const path = ann.path || []
           if (path.length > 1) {
-            let svgPath = `M ${path[0].x / scale} ${pageHeight - (path[0].y / scale)}`
+            // pdf-lib's drawSvgPath uses standard SVG coordinates (top-down)
+            // So we use our raw UI coordinates and set the anchor at (0, pageHeight)
+            let svgPath = `M ${path[0].x / scale} ${path[0].y / scale}`
             for (let i = 1; i < path.length; i++) {
-              svgPath += ` L ${path[i].x / scale} ${pageHeight - (path[i].y / scale)}`
+              svgPath += ` L ${path[i].x / scale} ${path[i].y / scale}`
             }
             page.drawSvgPath(svgPath, {
+              x: 0,
+              y: pageHeight,
               borderColor: hexToRgbPdf(ann.fontColor || '#818cf8'),
               borderWidth: 2.5 / scale
             })

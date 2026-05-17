@@ -268,6 +268,8 @@ async def extract_text(file: UploadFile = File(...)):
 
         result = {"pages": {}}
 
+        font_cache = {}
+
         for page_index in range(len(doc)):
             page = doc[page_index]
             page_width  = page.rect.width
@@ -294,13 +296,20 @@ async def extract_text(file: UploadFile = File(...)):
                         raw_font    = span.get("font", "")
                         flags       = span.get("flags", 0)
 
-                        font_info   = normalize_font_name(raw_font)
+                        if raw_font not in font_cache:
+                            info = normalize_font_name(raw_font)
+                            stripped = re.sub(r'^[A-Z]{6}\+', '', raw_font)
+                            css_family = f'"{stripped}", {info["cssFamily"]}'
+                            font_cache[raw_font] = {
+                                "weight": info["fontWeight"],
+                                "style": info["fontStyle"],
+                                "cssFamily": css_family,
+                                "genericFamily": info["genericFamily"]
+                            }
 
-                        # Flags from PyMuPDF can be unreliable for style —
-                        # use the name-derived values as primary, flags as
-                        # fallback only when name gives nothing useful.
-                        font_weight = font_info["fontWeight"]
-                        font_style  = font_info["fontStyle"]
+                        cached_font = font_cache[raw_font]
+                        font_weight = cached_font["weight"]
+                        font_style  = cached_font["style"]
 
                         # But if flags explicitly say bold/italic AND name
                         # didn't catch it, trust the flags too
@@ -308,9 +317,6 @@ async def extract_text(file: UploadFile = File(...)):
                             font_weight = "bold"
                         if flags & 2 and font_style == "normal":
                             font_style = "italic"
-
-                        stripped = re.sub(r'^[A-Z]{6}\+', '', raw_font)
-                        css_family = f'"{stripped}", {font_info["cssFamily"]}'
 
                         spans_list.append({
                             "page":        page_index + 1,
@@ -321,8 +327,8 @@ async def extract_text(file: UploadFile = File(...)):
                             "height":      bbox[3] - bbox[1],
                             "fontSize":    span.get("size", 12),
                             "fontName":    raw_font,        # raw, for debugging
-                            "fontFamily":  css_family,   # use this in CSS
-                            "genericFamily": font_info["genericFamily"],
+                            "fontFamily":  cached_font["cssFamily"],   # use this in CSS
+                            "genericFamily": cached_font["genericFamily"],
                             "fontWeight":  font_weight,
                             "fontStyle":   font_style,
                             "color":       f'#{color_int:06x}',
