@@ -9,6 +9,7 @@ export type ExtractedTextItem = {
   height: number;
   fontSize: number;
   fontName: string;
+  fontFamily: string;
   fontWeight: string;
   fontStyle: string;
   color: string;

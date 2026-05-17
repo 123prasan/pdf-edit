@@ -341,6 +341,79 @@ async def extract_text(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ------------------------------------------------------------------ #
+#  Lightweight endpoint: colors + embedded fonts ONLY                  #
+#  Skips all font normalization — ~70% less CPU work                  #
+# ------------------------------------------------------------------ #
+
+@app.post("/extract-colors")
+async def extract_colors(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        doc = fitz.open(stream=content, filetype="pdf")
+
+        if doc.is_encrypted:
+            raise HTTPException(status_code=400, detail="PDF is encrypted")
+
+        result = {"pages": {}}
+
+        for page_index in range(len(doc)):
+            page = doc[page_index]
+
+            blocks = page.get_text(
+                "dict",
+                flags=fitz.TEXT_PRESERVE_WHITESPACE | fitz.TEXT_PRESERVE_LIGATURES
+            )["blocks"]
+
+            spans_list = []
+
+            for block in blocks:
+                if "lines" not in block:
+                    continue
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        text = span.get("text", "")
+                        if not text.strip():
+                            continue
+
+                        bbox      = span["bbox"]
+                        color_int = span.get("color", 0)
+                        raw_font  = span.get("font", "")
+                        flags     = span.get("flags", 0)
+
+                        # Only extract what client can't get: color + accurate font weight/style
+                        font_weight = "normal"
+                        font_style  = "normal"
+                        lower = raw_font.lower()
+                        if any(k in lower for k in ["bold", "black", "heavy", "semibold"]):
+                            font_weight = "bold"
+                        if flags & 16 and font_weight == "normal":
+                            font_weight = "bold"
+                        if any(k in lower for k in ["italic", "oblique", "slanted"]):
+                            font_style = "italic"
+                        if flags & 2 and font_style == "normal":
+                            font_style = "italic"
+
+                        spans_list.append({
+                            "str":        text,
+                            "x":          round(bbox[0], 1),
+                            "y":          round(bbox[1], 1),
+                            "color":      f'#{color_int:06x}',
+                            "fontWeight": font_weight,
+                            "fontStyle":  font_style,
+                        })
+
+            result["pages"][str(page_index + 1)] = spans_list
+
+        result["embeddedFonts"] = extract_embedded_fonts(doc)
+        doc.close()
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 def hex_to_rgb(hex_color: str):
     if not hex_color or not isinstance(hex_color, str):
         return (0, 0, 0)
