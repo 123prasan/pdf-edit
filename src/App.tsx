@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import type { TextEdit } from './components/TextEditLayer'
 import PdfPageRenderer from './components/PdfPageRenderer'
 import {
@@ -437,6 +437,7 @@ export default function App() {
   }, [loadPdfFromBytes, showToast])
 
   // ---- Export ----
+  // ---- Export ----
   const handleExport = useCallback(async () => {
     const bytes = pdfBytesRef.current
     if (!bytes) {
@@ -444,44 +445,152 @@ export default function App() {
       return
     }
     setIsExporting(true)
-    showToast('Applying high-fidelity edits on server... Please wait.')
+    showToast('Applying high-fidelity edits locally... Please wait.')
     try {
-      const formData = new FormData()
-      // Use the current in-memory bytes (which includes any inserted/deleted pages)
-      // instead of the original uploaded file
-      const currentBlob = new Blob([bytes], { type: 'application/pdf' })
-      formData.append('file', currentBlob, fileName || 'document.pdf')
-      formData.append('annotations', JSON.stringify(annotations))
-      formData.append('textEdits', JSON.stringify(textEdits))
-      formData.append('scale', scale.toString())
-
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      const res = await fetch(`${API_URL}/export`, {
-        method: 'POST',
-        body: formData
-      })
-      if (!res.ok) throw new Error(`Server export failed: ${res.statusText}`)
-
-      const contentType = res.headers.get('content-type')
-      if (contentType && contentType.includes('text/html')) {
-        const text = await res.text()
-        console.error("Received HTML instead of PDF:", text)
-        throw new Error("Server returned HTML. Ensure backend URL is correct.")
+      const doc = await PDFDocument.load(bytes)
+      
+      const hexToRgbPdf = (hex: string) => {
+        if (!hex) return undefined
+        const clean = hex.replace('#', '')
+        if (clean.length !== 6) return undefined
+        return rgb(
+          parseInt(clean.substring(0, 2), 16) / 255,
+          parseInt(clean.substring(2, 4), 16) / 255,
+          parseInt(clean.substring(4, 6), 16) / 255
+        )
       }
 
-      const exportedBlob = new Blob([await res.blob()], { type: 'application/pdf' })
+      // We need to embed a font to write text
+      const helveticaFont = await doc.embedFont(StandardFonts.Helvetica)
+      const helveticaBold = await doc.embedFont(StandardFonts.HelveticaBold)
+      const helveticaOblique = await doc.embedFont(StandardFonts.HelveticaOblique)
+      const helveticaBoldOblique = await doc.embedFont(StandardFonts.HelveticaBoldOblique)
+
+      for (const ann of annotations) {
+        const pageNum = ann.page - 1
+        if (pageNum < 0 || pageNum >= doc.getPageCount()) continue
+        const page = doc.getPage(pageNum)
+        const { height: pageHeight } = page.getSize()
+
+        // PDF coordinates are from bottom-left! We must flip Y.
+        // The scale used in UI is relative to standard 72 DPI rendering.
+        // Wait, pdf-lib coordinates are bottom-left.
+        // UI coordinates: Top-Left is (0,0). Y increases downwards.
+        // PDF coordinates: Bottom-Left is (0,0). Y increases upwards.
+        // Y_pdf = pageHeight - Y_ui - Height_ui
+        const x = ann.x / scale
+        const y_ui = ann.y / scale
+        const w = (ann.width || 0) / scale
+        const h = (ann.height || 0) / scale
+        const y_pdf = pageHeight - y_ui - h
+
+        if (ann.type === 'highlight') {
+          page.drawRectangle({
+            x, y: y_pdf, width: w, height: h,
+            color: hexToRgbPdf(ann.color || '#fbbf24'),
+            opacity: ann.opacity || 0.3
+          })
+        } else if (ann.type === 'ink') {
+          const path = ann.path || []
+          if (path.length > 1) {
+            let svgPath = `M ${path[0].x / scale} ${pageHeight - (path[0].y / scale)}`
+            for (let i = 1; i < path.length; i++) {
+              svgPath += ` L ${path[i].x / scale} ${pageHeight - (path[i].y / scale)}`
+            }
+            page.drawSvgPath(svgPath, {
+              borderColor: hexToRgbPdf(ann.fontColor || '#818cf8'),
+              borderWidth: 2.5 / scale
+            })
+          }
+        } else if (ann.type === 'rect') {
+          page.drawRectangle({
+            x, y: y_pdf, width: w, height: h,
+            borderColor: hexToRgbPdf(ann.strokeColor || '#000000'),
+            color: ann.fillColor !== 'transparent' ? hexToRgbPdf(ann.fillColor || '') : undefined,
+            borderWidth: (ann.strokeWidth || 2) / scale
+          })
+        } else if (ann.type === 'ellipse') {
+          page.drawEllipse({
+            x: x + w / 2, y: y_pdf + h / 2,
+            xScale: w / 2, yScale: h / 2,
+            borderColor: hexToRgbPdf(ann.strokeColor || '#000000'),
+            color: ann.fillColor !== 'transparent' ? hexToRgbPdf(ann.fillColor || '') : undefined,
+            borderWidth: (ann.strokeWidth || 2) / scale
+          })
+        } else if (ann.type === 'line') {
+          const x2 = (ann.x2 || ann.x) / scale
+          const y2_ui = (ann.y2 || ann.y) / scale
+          const y2_pdf = pageHeight - y2_ui
+          page.drawLine({
+            start: { x: x, y: pageHeight - y_ui },
+            end: { x: x2, y: y2_pdf },
+            thickness: (ann.strokeWidth || 2) / scale,
+            color: hexToRgbPdf(ann.strokeColor || '#000000')
+          })
+        } else if (ann.type === 'text') {
+          const textY = pageHeight - y_ui - ((ann.fontSize || 14) * 0.8) // approx baseline
+          page.drawText(ann.text || '', {
+            x, y: textY,
+            size: ann.fontSize || 14,
+            font: helveticaFont,
+            color: hexToRgbPdf(ann.fontColor || '#000000')
+          })
+        }
+      }
+
+      for (const edit of textEdits) {
+        const pageNum = edit.page - 1
+        if (pageNum < 0 || pageNum >= doc.getPageCount()) continue
+        const page = doc.getPage(pageNum)
+        const { height: pageHeight } = page.getSize()
+
+        const bounds = edit.bounds
+        const origBounds = edit.originalBounds || bounds
+
+        if (origBounds && edit.itemIndex >= 0) {
+          const ox = origBounds.x / scale
+          const oy_ui = origBounds.y / scale
+          const ow = origBounds.w / scale
+          const oh = origBounds.h / scale
+          // Draw white rectangle to hide original text
+          page.drawRectangle({
+            x: ox, y: pageHeight - oy_ui - oh,
+            width: ow, height: oh,
+            color: rgb(1, 1, 1) // white out
+          })
+        }
+
+        const newText = edit.newText || ''
+        if (newText.trim() === '') continue
+
+        let selFont = helveticaFont
+        if (edit.fontWeight === 'bold' && edit.fontStyle === 'italic') selFont = helveticaBoldOblique
+        else if (edit.fontWeight === 'bold') selFont = helveticaBold
+        else if (edit.fontStyle === 'italic') selFont = helveticaOblique
+
+        const nx = bounds.x / scale
+        const ny_ui = bounds.y / scale
+        const textY = pageHeight - ny_ui - ((edit.fontSize || 12) * 0.8)
+        page.drawText(newText, {
+          x: nx, y: textY,
+          size: edit.fontSize || 12,
+          font: selFont,
+          color: hexToRgbPdf(edit.color || '#000000')
+        })
+      }
+
+      const exportedBytes = await doc.save()
+      const exportedBlob = new Blob([exportedBytes], { type: 'application/pdf' })
       const url = URL.createObjectURL(exportedBlob)
       const filename = fileName ? fileName.replace(/\.pdf$/i, '_edited.pdf') : 'edited.pdf'
 
-      // Delay revoking so download has time to start (handled in interstitial now)
       setTimeout(() => URL.revokeObjectURL(url), 60000)
 
-      // Show interstitial which handles the download
       setPendingDownload({ url, filename })
       showToast('PDF exported securely with pixel-perfect accuracy!')
     } catch (err) {
       console.error(err)
-      showToast('Export failed. Make sure server is running.')
+      showToast('Export failed.')
     } finally {
       setIsExporting(false)
     }
