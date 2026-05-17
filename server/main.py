@@ -268,9 +268,10 @@ async def extract_text(file: UploadFile = File(...)):
 
         result = {"pages": {}}
 
-        font_cache = {}
+        import concurrent.futures
 
-        for page_index in range(len(doc)):
+        # PyMuPDF releases the GIL, so we can parse pages in parallel across CPU cores!
+        def process_page(page_index):
             page = doc[page_index]
             page_width  = page.rect.width
             page_height = page.rect.height
@@ -281,6 +282,7 @@ async def extract_text(file: UploadFile = File(...)):
             )["blocks"]
 
             spans_list = []
+            local_cache = {}
 
             for block in blocks:
                 if "lines" not in block:
@@ -296,23 +298,21 @@ async def extract_text(file: UploadFile = File(...)):
                         raw_font    = span.get("font", "")
                         flags       = span.get("flags", 0)
 
-                        if raw_font not in font_cache:
+                        if raw_font not in local_cache:
                             info = normalize_font_name(raw_font)
                             stripped = re.sub(r'^[A-Z]{6}\+', '', raw_font)
                             css_family = f'"{stripped}", {info["cssFamily"]}'
-                            font_cache[raw_font] = {
+                            local_cache[raw_font] = {
                                 "weight": info["fontWeight"],
                                 "style": info["fontStyle"],
                                 "cssFamily": css_family,
                                 "genericFamily": info["genericFamily"]
                             }
 
-                        cached_font = font_cache[raw_font]
+                        cached_font = local_cache[raw_font]
                         font_weight = cached_font["weight"]
                         font_style  = cached_font["style"]
 
-                        # But if flags explicitly say bold/italic AND name
-                        # didn't catch it, trust the flags too
                         if flags & 16 and font_weight == "normal":
                             font_weight = "bold"
                         if flags & 2 and font_style == "normal":
@@ -326,8 +326,8 @@ async def extract_text(file: UploadFile = File(...)):
                             "width":       bbox[2] - bbox[0],
                             "height":      bbox[3] - bbox[1],
                             "fontSize":    span.get("size", 12),
-                            "fontName":    raw_font,        # raw, for debugging
-                            "fontFamily":  cached_font["cssFamily"],   # use this in CSS
+                            "fontName":    raw_font,
+                            "fontFamily":  cached_font["cssFamily"],
                             "genericFamily": cached_font["genericFamily"],
                             "fontWeight":  font_weight,
                             "fontStyle":   font_style,
@@ -336,10 +336,17 @@ async def extract_text(file: UploadFile = File(...)):
                             "pageHeight":  page_height,
                         })
 
-            result["pages"][str(page_index + 1)] = spans_list
+            return str(page_index + 1), spans_list
+
+        # Execute page parsing in parallel using all available CPU cores
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {executor.submit(process_page, i): i for i in range(len(doc))}
+            for future in concurrent.futures.as_completed(futures):
+                page_str, spans = future.result()
+                result["pages"][page_str] = spans
 
         # Embedded fonts are now fetched separately via /extract-fonts
-        # This makes /extract-text blazing fast (~50ms for most PDFs)
+        # This makes /extract-text blazing fast
         doc.close()
         return result
 
