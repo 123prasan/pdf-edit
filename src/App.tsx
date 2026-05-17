@@ -369,10 +369,10 @@ export default function App() {
       const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) }) // copy to avoid detached buffer
       const pdf = await loadingTask.promise
 
-      // Calculate responsive scale to perfectly fit mobile, or 1.25 for desktop
+      // Calculate responsive scale to perfectly fit mobile, or 1.6 for desktop
       const firstPage = await pdf.getPage(1)
       const baseVp = firstPage.getViewport({ scale: 1.0 })
-      let initialScale = 1.25
+      let initialScale = 1.6
       if (window.innerWidth <= 768) {
         // Screen width minus side padding (approx 32px)
         const targetWidth = window.innerWidth - 32

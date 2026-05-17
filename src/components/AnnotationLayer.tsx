@@ -89,15 +89,21 @@ export default function AnnotationLayer({
         const { id, startX, startY, origX, origY } = dragRef.current
         const dx = e.clientX - startX
         const dy = e.clientY - startY
-        onUpdateAnnotation(id, { x: origX + dx, y: origY + dy })
+        
+        let newX = origX + dx
+        let newY = origY + dy
+        newX = Math.max(0, Math.min(newX, canvasWidth - 20)) // 20px padding
+        newY = Math.max(0, Math.min(newY, canvasHeight - 20))
+        
+        onUpdateAnnotation(id, { x: newX, y: newY })
       }
       if (resizeRef.current) {
         const { id, startX, startY, origW, origH } = resizeRef.current
         const dx = e.clientX - startX
         const dy = e.clientY - startY
         onUpdateAnnotation(id, {
-          width: Math.max(40, origW + dx),
-          height: Math.max(20, origH + dy),
+          width: Math.max(20, Math.min(origW + dx, canvasWidth)),
+          height: Math.max(20, Math.min(origH + dy, canvasHeight)),
         })
       }
     }
@@ -113,7 +119,7 @@ export default function AnnotationLayer({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [scale, onUpdateAnnotation])
+  }, [scale, onUpdateAnnotation, canvasWidth, canvasHeight])
 
   // ---- Layer-level mouse events (drawing tools) ----
   const handleLayerMouseDown = (e: React.MouseEvent) => {

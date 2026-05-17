@@ -304,10 +304,20 @@ export default function TextEditLayer({
 
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
       d.moved = true
-      d.span.style.left = `${d.spanLeft + dx}px`
-      d.span.style.top = `${d.spanTop + dy}px`
+      
+      let newLeft = d.spanLeft + dx
+      let newTop = d.spanTop + dy
+      
+      const spanW = d.span.offsetWidth || 0
+      const spanH = d.span.offsetHeight || 0
+      
+      newLeft = Math.max(0, Math.min(newLeft, canvasWidth - spanW))
+      newTop = Math.max(0, Math.min(newTop, canvasHeight - spanH))
+
+      d.span.style.left = `${newLeft}px`
+      d.span.style.top = `${newTop}px`
     }
-  }, [active])
+  }, [active, canvasWidth, canvasHeight])
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
@@ -597,16 +607,11 @@ export default function TextEditLayer({
           <div
             className="text-edit-toolbar"
             style={{
-              '--menu-left': `${editingItem.bounds.x}px`,
+              '--menu-left': `${Math.max(0, editingItem.bounds.x)}px`,
               '--menu-top': `${editingItem.bounds.y - 50}px`,
             } as React.CSSProperties}
           >
             <select
-              style={{
-                padding: '4px 6px', fontSize: 13, border: '1px solid var(--border-default)',
-                borderRadius: 'var(--radius-sm)', maxWidth: 120, background: 'var(--bg-tertiary)',
-                color: 'var(--text-primary)', outline: 'none'
-              }}
               value={editingItem.fontFamily.split(',')[0].replace(/['"]/g, '').trim()}
               onChange={(e) => setEditingItem({ ...editingItem, fontFamily: `"${e.target.value}", sans-serif` })}
             >
@@ -626,11 +631,7 @@ export default function TextEditLayer({
 
             <input
               type="number"
-              style={{
-                width: 46, padding: '4px 2px', fontSize: 13, border: '1px solid var(--border-default)',
-                borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
-                outline: 'none', textAlign: 'center'
-              }}
+              style={{ width: 50, textAlign: 'center' }}
               value={Math.round(editingItem.fontSize)}
               onChange={(e) => setEditingItem({ ...editingItem, fontSize: Number(e.target.value) || 12 })}
               title="Font Size"
@@ -638,7 +639,7 @@ export default function TextEditLayer({
 
             <input
               type="color"
-              style={{ width: 24, height: 24, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              style={{ width: 28, height: 28, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', borderRadius: '50%' }}
               value={editingItem.color}
               onChange={(e) => setEditingItem({ ...editingItem, color: e.target.value })}
               title="Text Color"
@@ -647,20 +648,16 @@ export default function TextEditLayer({
             <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
 
             <button
-              style={{
-                width: 32, height: 32, border: 'none', background: editingItem.fontWeight === 'bold' ? 'var(--bg-hover)' : 'transparent',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 'bold', fontSize: 14, color: 'var(--text-primary)'
-              }}
+              className={`text-edit-btn ${editingItem.fontWeight === 'bold' ? 'active' : ''}`}
+              style={{ fontWeight: 'bold' }}
               onClick={() => setEditingItem({ ...editingItem, fontWeight: editingItem.fontWeight === 'bold' ? 'normal' : 'bold' })}
               title="Bold"
             >
               B
             </button>
             <button
-              style={{
-                width: 32, height: 32, border: 'none', background: editingItem.fontStyle === 'italic' ? 'var(--bg-hover)' : 'transparent',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontStyle: 'italic', fontSize: 14, fontFamily: 'serif', color: 'var(--text-primary)'
-              }}
+              className={`text-edit-btn ${editingItem.fontStyle === 'italic' ? 'active' : ''}`}
+              style={{ fontStyle: 'italic', fontFamily: 'serif' }}
               onClick={() => setEditingItem({ ...editingItem, fontStyle: editingItem.fontStyle === 'italic' ? 'normal' : 'italic' })}
               title="Italic"
             >
@@ -670,10 +667,8 @@ export default function TextEditLayer({
             <div style={{ width: 1, height: 20, background: 'var(--border-default)', margin: '0 4px' }} />
 
             <button
-              style={{
-                width: 32, height: 32, border: 'none', background: 'transparent', color: 'var(--danger)',
-                borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 15
-              }}
+              className="text-edit-btn"
+              style={{ color: 'var(--danger)', fontSize: 16 }}
               onClick={() => {
                 setEditingItem({ ...editingItem, text: '' }) // Clearing text effectively deletes it
                 setTimeout(commitEdit, 0)
