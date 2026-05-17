@@ -188,6 +188,8 @@ export default function TextEditLayer({
             pointer-events: ${active ? 'auto' : 'none'};
             user-select: none;
             touch-action: none;
+            padding: 15px;
+            margin: -15px;
           `
           if (active) {
             span.title = 'Double click to edit, drag to move'
@@ -773,13 +775,15 @@ export default function TextEditLayer({
               transformOrigin: 'top left',
               letterSpacing: edit.letterSpacing,
               background: 'transparent',
-              padding: 0,
-              margin: 0,
+              padding: '15px',
+              margin: '-15px',
               whiteSpace: 'nowrap',
               lineHeight: 1,
               zIndex: 16,
               cursor: active ? 'move' : 'default',
               pointerEvents: active ? 'auto' : 'none',
+              userSelect: 'none',
+              touchAction: 'none',
             }}
             data-edited-id={edit.id}
             data-item-index={edit.itemIndex}
