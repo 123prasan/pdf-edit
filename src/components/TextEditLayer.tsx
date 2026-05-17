@@ -532,7 +532,8 @@ export default function TextEditLayer({
       className="text-edit-container"
       style={{
         position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight,
-        zIndex: active ? 15 : 3, pointerEvents: active ? 'auto' : 'none'
+        zIndex: active ? 15 : 3, pointerEvents: active ? 'auto' : 'none',
+        touchAction: 'none'
       }}
       onDoubleClick={handleDoubleClick}
       onPointerDown={handlePointerDown}
@@ -596,21 +597,9 @@ export default function TextEditLayer({
           <div
             className="text-edit-toolbar"
             style={{
-              position: 'absolute',
-              left: editingItem.bounds.x,
-              top: editingItem.bounds.y - 50, // Hover above with space
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: 'var(--bg-surface)',
-              backdropFilter: 'blur(16px)',
-              padding: '6px 8px',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)',
-              border: '1px solid var(--border-default)',
-              zIndex: 201,
-              animation: 'popIn 0.3s var(--ease-spring)',
-            }}
+              '--menu-left': `${editingItem.bounds.x}px`,
+              '--menu-top': `${editingItem.bounds.y - 50}px`,
+            } as React.CSSProperties}
           >
             <select
               style={{

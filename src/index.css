@@ -94,7 +94,7 @@ body {
 .app-root {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -153,6 +153,22 @@ body {
 }
 
 /* ---------- Tools Sidebar ---------- */
+.text-edit-toolbar {
+  position: absolute;
+  left: var(--menu-left);
+  top: var(--menu-top);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  backdrop-filter: blur(16px);
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-default);
+  z-index: 201;
+  animation: popIn 0.3s var(--ease-spring);
+}
 .tools-sidebar {
   width: 72px;
   min-width: 72px;
@@ -1147,11 +1163,16 @@ select.input-sm {
 @media (max-width: 768px) {
   .app-header {
     padding: 12px 16px;
+    padding-top: calc(env(safe-area-inset-top, 12px) + 12px);
     gap: 8px;
     height: auto;
-    min-height: 64px;
+    min-height: 72px;
     flex-wrap: wrap;
     justify-content: space-between;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
   }
   
   .app-logo {
@@ -1172,6 +1193,7 @@ select.input-sm {
     min-width: 44px;
     height: 44px;
     justify-content: center;
+    border-radius: var(--radius-md);
   }
 
   .toolbar-strip {
@@ -1255,7 +1277,7 @@ select.input-sm {
 
   .canvas-scroll {
     padding: 16px;
-    padding-bottom: 90px; /* Space for bottom nav */
+    padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 90px); /* Keep safe space for bottom nav */
     display: flex;
     justify-content: flex-start;
     align-items: center; /* keep centered on mobile */
@@ -1301,6 +1323,19 @@ select.input-sm {
 
   .hero-section {
     gap: 20px;
+  }
+
+  .text-edit-toolbar {
+    position: fixed;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 20px) + 80px) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 90vw;
+    max-width: 360px;
+    overflow-x: auto;
+    z-index: 1000;
+    justify-content: flex-start;
   }
 }
 
