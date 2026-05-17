@@ -545,14 +545,15 @@ export default function App() {
         style={{ display: 'none' }}
       />
 
-      {/* ============ HEADER ============ */}
+      {/* ============ HEADER — only when editing ============ */}
+      {pdfBytes && (
       <header className="app-header">
         <div className="app-logo">
           <IconPDF />
           <span>PDF Studio</span>
         </div>
 
-        {pdfBytes && (docColors.length > 0 || docFonts.length > 0) && (
+        {(docColors.length > 0 || docFonts.length > 0) && (
           <div className="doc-palette-header" style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, paddingLeft: '32px' }}>
 
             <div style={{ position: 'relative' }}>
@@ -650,7 +651,7 @@ export default function App() {
         <div className="header-actions">
           <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
             <IconUpload />
-            <span className="hide-mobile">Open PDF</span>
+            <span className="hide-mobile">New PDF</span>
           </button>
           <button className={`btn-primary ${isExporting ? 'exporting' : ''}`} onClick={handleExport} disabled={!pdfBytes || isExporting}>
             {isExporting ? <div className="spinner" /> : <IconDownload />}
@@ -658,6 +659,7 @@ export default function App() {
           </button>
         </div>
       </header>
+      )}
 
       {/* Exporting Overlay */}
       {isExporting && (
@@ -671,6 +673,65 @@ export default function App() {
       )}
 
       {/* ============ BODY ============ */}
+      {!pdfBytes ? (
+        /* ---- Full-Screen Landing Page ---- */
+        <div className="landing-page">
+          {/* Decorative background blobs */}
+          <div className="landing-bg">
+            <div className="blob blob-1" />
+            <div className="blob blob-2" />
+            <div className="blob blob-3" />
+            <div className="grid-pattern" />
+          </div>
+
+          {/* Landing Navbar */}
+          <nav className="landing-nav">
+            <div className="app-logo">
+              <IconPDF />
+              <span>PDF Studio</span>
+            </div>
+            <button className="btn-primary" onClick={() => fileInputRef.current?.click()}>
+              <IconUpload /> Get Started
+            </button>
+          </nav>
+
+          {/* Hero Content */}
+          <div className="hero-section">
+            <div className="hero-badge">Free · No Signup · No Watermarks</div>
+            <h1 className="hero-title">Edit PDFs Online<br /><span className="hero-gradient">In Seconds</span></h1>
+            <p className="hero-subtitle">Add text, shapes, highlights, annotations, and freehand drawings. Export pixel-perfect PDFs directly from your browser — no downloads, no accounts.</p>
+
+            <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
+              <div className="drop-icon"><IconUpload /></div>
+              <div className="drop-title">Drop your PDF here</div>
+              <div className="drop-subtitle">or click to browse files · Max 50MB</div>
+            </div>
+
+            <div className="feature-grid">
+              <div className="feature-card"><div className="feature-icon fi-indigo"><IconEdit /></div><h3>Edit Text</h3><p>Click any text to edit in-place with original fonts preserved</p></div>
+              <div className="feature-card"><div className="feature-icon fi-sky"><IconSquare /></div><h3>Add Shapes</h3><p>Rectangles, circles, and lines with custom colors</p></div>
+              <div className="feature-card"><div className="feature-icon fi-amber"><IconHighlighter /></div><h3>Highlight</h3><p>Mark important passages with adjustable colors</p></div>
+              <div className="feature-card"><div className="feature-icon fi-emerald"><IconPen /></div><h3>Freehand Draw</h3><p>Sketch annotations, signatures, or notes</p></div>
+              <div className="feature-card"><div className="feature-icon fi-violet"><IconType /></div><h3>Add Text</h3><p>Place text boxes anywhere on the page</p></div>
+              <div className="feature-card"><div className="feature-icon fi-rose"><IconDownload /></div><h3>Export PDF</h3><p>Download with all changes permanently saved</p></div>
+            </div>
+
+            <div className="trust-section">
+              <div className="trust-item"><strong>100%</strong><span>Browser-based</span></div>
+              <div className="trust-divider" />
+              <div className="trust-item"><strong>0</strong><span>Watermarks</span></div>
+              <div className="trust-divider" />
+              <div className="trust-item"><strong>Free</strong><span>Forever</span></div>
+              <div className="trust-divider" />
+              <div className="trust-item"><strong>Secure</strong><span>Files stay private</span></div>
+            </div>
+
+            <footer className="landing-footer">
+              <p>Built with care · Your files never leave your browser</p>
+            </footer>
+          </div>
+        </div>
+      ) : (
       <div className="app-body">
 
         {/* ---- Left Sidebar ---- */}
@@ -703,38 +764,7 @@ export default function App() {
 
         {/* ---- Main Canvas Area ---- */}
         <div className="canvas-area">
-          {!pdfBytes ? (
-            /* Welcome / Drop Zone */
-            <div className="welcome-zone">
-              <div className="hero-section">
-                <div className="hero-badge">Free · No Signup · No Watermarks</div>
-                <h1 className="hero-title">The PDF Editor<br /><span className="hero-gradient">Built for Everyone</span></h1>
-                <p className="hero-subtitle">Edit text, add shapes, highlight, annotate, and export pixel-perfect PDFs — all in your browser.</p>
-                <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
-                  <div className="drop-icon"><IconUpload /></div>
-                  <div className="drop-title">Drop your PDF here</div>
-                  <div className="drop-subtitle">or click to browse files</div>
-                </div>
-                <div className="feature-grid">
-                  <div className="feature-card"><div className="feature-icon fi-indigo"><IconEdit /></div><h3>Edit Text</h3><p>Click any text to edit in-place</p></div>
-                  <div className="feature-card"><div className="feature-icon fi-sky"><IconSquare /></div><h3>Shapes</h3><p>Rectangles, circles, and lines</p></div>
-                  <div className="feature-card"><div className="feature-icon fi-amber"><IconHighlighter /></div><h3>Highlight</h3><p>Mark passages with any color</p></div>
-                  <div className="feature-card"><div className="feature-icon fi-emerald"><IconPen /></div><h3>Freehand</h3><p>Draw annotations and signatures</p></div>
-                  <div className="feature-card"><div className="feature-icon fi-violet"><IconType /></div><h3>Add Text</h3><p>Place text boxes anywhere</p></div>
-                  <div className="feature-card"><div className="feature-icon fi-rose"><IconDownload /></div><h3>Export</h3><p>Download with all edits baked in</p></div>
-                </div>
-                <div className="trust-section">
-                  <div className="trust-item"><strong>100%</strong><span>Browser-based</span></div>
-                  <div className="trust-divider" />
-                  <div className="trust-item"><strong>0</strong><span>Watermarks</span></div>
-                  <div className="trust-divider" />
-                  <div className="trust-item"><strong>Free</strong><span>Forever</span></div>
-                  <div className="trust-divider" />
-                  <div className="trust-item"><strong>Secure</strong><span>Files stay private</span></div>
-                </div>
-              </div>
-            </div>
-          ) : (
+          {!pdfBytes ? null : (
             <>
               {/* Vertical Scroll PDF Container */}
               <div className="canvas-scroll" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
@@ -999,20 +1029,21 @@ export default function App() {
           </aside>
         )}
       </div>
+      )}
 
-      {/* ============ STATUS BAR ============ */}
+      {/* ============ STATUS BAR — only when editing ============ */}
+      {pdfBytes && (
       <div className="status-bar">
         <div className="status-dot" />
         <span>Ready</span>
-        {pdfBytes && (
-          <>
-            <span>|</span>
-            <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
-            <span>|</span>
-            <span>Page {currentPage}/{numPages}</span>
-          </>
-        )}
+        <>
+          <span>|</span>
+          <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
+          <span>|</span>
+          <span>Page {currentPage}/{numPages}</span>
+        </>
       </div>
+      )}
     </div >
   )
 }

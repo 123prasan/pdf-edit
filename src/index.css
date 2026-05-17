@@ -534,6 +534,108 @@ select.input-sm {
 }
 
 /* ============================================================
+   Full-Screen Landing Page
+   ============================================================ */
+.landing-page {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-primary);
+}
+
+.landing-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+  animation: blob-float 12s ease-in-out infinite;
+}
+
+.blob-1 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.15), transparent 70%);
+  top: -10%;
+  right: -5%;
+  animation-delay: 0s;
+}
+
+.blob-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12), transparent 70%);
+  bottom: 10%;
+  left: -8%;
+  animation-delay: -4s;
+}
+
+.blob-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.1), transparent 70%);
+  top: 40%;
+  right: 15%;
+  animation-delay: -8s;
+}
+
+@keyframes blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(79, 70, 229, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  position: relative;
+  z-index: 10;
+  animation: fadeInUp 0.4s var(--ease-out);
+}
+
+.landing-footer {
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+.landing-footer p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .landing-nav {
+    padding: 12px 16px;
+  }
+  .landing-nav .btn-primary {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+}
+
+/* ============================================================
    Welcome / Drop Zone + Enterprise Landing Page
    ============================================================ */
 .welcome-zone {
@@ -553,6 +655,10 @@ select.input-sm {
   gap: 28px;
   max-width: 800px;
   width: 100%;
+  padding: 20px 24px 40px;
+  position: relative;
+  z-index: 10;
+  margin: 0 auto;
   animation: fadeInUp 0.6s var(--ease-out);
 }
 
