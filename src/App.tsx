@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
+import { PDFDocument, degrees } from 'pdf-lib'
 import type { TextEdit } from './components/TextEditLayer'
 import PdfPageRenderer from './components/PdfPageRenderer'
 import {
@@ -570,6 +571,76 @@ export default function App() {
   const prevPage = () => setCurrentPage(p => Math.max(1, p - 1))
   const nextPage = () => setCurrentPage(p => Math.min(numPages, p + 1))
 
+  const [showPropsPanel, setShowPropsPanel] = useState(true)
+
+  // ---- Page operations (via pdf-lib) ----
+  const reloadPdfFromBytes = useCallback(async (newBytes: Uint8Array) => {
+    const loadingTask = pdfjsLib.getDocument({ data: newBytes.slice(0) })
+    const pdf = await loadingTask.promise
+    pdfDocRef.current = pdf
+    setPdfBytes(newBytes)
+    pdfBytesRef.current = newBytes
+    setNumPages(pdf.numPages)
+    setAnnotations([])
+    setTextEdits([])
+    setHistory([[]])
+    setHistoryIndex(0)
+    setSelectedId(null)
+    setPdfReady(prev => prev + 1)
+  }, [])
+
+  const deletePage = useCallback(async (pageNum: number) => {
+    if (!pdfBytes || numPages <= 1) {
+      showToast('Cannot delete the only page')
+      return
+    }
+    try {
+      const doc = await PDFDocument.load(pdfBytes)
+      doc.removePage(pageNum - 1) // 0-indexed
+      const saved = await doc.save()
+      const newBytes = new Uint8Array(saved)
+      setCurrentPage(p => Math.min(p, numPages - 1))
+      await reloadPdfFromBytes(newBytes)
+      showToast(`Deleted page ${pageNum}`)
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to delete page')
+    }
+  }, [pdfBytes, numPages, reloadPdfFromBytes, showToast])
+
+  const rotatePage = useCallback(async (pageNum: number, angle: number) => {
+    if (!pdfBytes) return
+    try {
+      const doc = await PDFDocument.load(pdfBytes)
+      const page = doc.getPage(pageNum - 1)
+      const currentRotation = page.getRotation().angle
+      page.setRotation(degrees(currentRotation + angle))
+      const saved = await doc.save()
+      await reloadPdfFromBytes(new Uint8Array(saved))
+      showToast(`Rotated page ${pageNum} by ${angle}°`)
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to rotate page')
+    }
+  }, [pdfBytes, reloadPdfFromBytes, showToast])
+
+  const insertBlankPage = useCallback(async (beforePageNum: number) => {
+    if (!pdfBytes) return
+    try {
+      const doc = await PDFDocument.load(pdfBytes)
+      // Get size of the page we're inserting before, to match dimensions
+      const refPage = doc.getPage(Math.min(beforePageNum - 1, doc.getPageCount() - 1))
+      const { width, height } = refPage.getSize()
+      doc.insertPage(beforePageNum - 1, [width, height])
+      const saved = await doc.save()
+      await reloadPdfFromBytes(new Uint8Array(saved))
+      showToast(`Inserted blank page before page ${beforePageNum}`)
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to insert page')
+    }
+  }, [pdfBytes, reloadPdfFromBytes, showToast])
+
   // ---- Tool button helper ----
   const ToolBtn = ({ value, icon, label }: { value: ToolType; icon: React.ReactNode; label: string }) => (
     <button
@@ -741,6 +812,13 @@ export default function App() {
           )}
 
           <div className="header-actions">
+            <button className="btn-ghost" onClick={() => setShowPropsPanel(p => !p)} title={showPropsPanel ? 'Hide Panel' : 'Show Panel'}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="15" y1="3" x2="15" y2="21" />
+              </svg>
+              <span className="hide-mobile">{showPropsPanel ? 'Hide' : 'Panel'}</span>
+            </button>
             <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
               <IconUpload />
               <span className="hide-mobile">New PDF</span>
@@ -875,6 +953,7 @@ export default function App() {
                       key={pageNum}
                       pdfDoc={pdfDocRef.current}
                       pageNumber={pageNum}
+                      totalPages={numPages}
                       scale={scale}
                       tool={tool}
                       activeColor={activeColor}
@@ -891,6 +970,9 @@ export default function App() {
                       onUpdateAnnotation={updateAnnotation}
                       onDeleteAnnotation={deleteAnnotation}
                       onSelectAnnotation={setSelectedId}
+                      onDeletePage={deletePage}
+                      onRotatePage={rotatePage}
+                      onInsertBlankPage={insertBlankPage}
                       onTextEdit={(edit) => {
                         setTextEdits(prev => {
                           const idx = prev.findIndex(e => e.id === edit.id)
@@ -910,7 +992,7 @@ export default function App() {
           </div>
 
           {/* ---- Right Properties Panel ---- */}
-          {pdfBytes && (
+          {pdfBytes && showPropsPanel && (
             <aside className="props-panel">
               <div>
                 <div className="props-section-title">Document</div>
@@ -1130,20 +1212,6 @@ export default function App() {
               </div>
             </aside>
           )}
-        </div>
-      )}
-
-      {/* ============ STATUS BAR — only when editing ============ */}
-      {pdfBytes && (
-        <div className="status-bar">
-          <div className="status-dot" />
-          <span>Ready</span>
-          <>
-            <span>|</span>
-            <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
-            <span>|</span>
-            <span>Page {currentPage}/{numPages}</span>
-          </>
         </div>
       )}
     </div >

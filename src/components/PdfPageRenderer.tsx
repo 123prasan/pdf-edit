@@ -5,6 +5,7 @@ import TextEditLayer from './TextEditLayer'
 interface Props {
   pdfDoc: any
   pageNumber: number
+  totalPages: number
   scale: number
   tool: string
   activeColor: string | null
@@ -22,12 +23,16 @@ interface Props {
   onDeleteAnnotation: (id: string) => void
   onSelectAnnotation: (id: string | null) => void
   onTextEdit: (edit: any) => void
+  onDeletePage: (pageNum: number) => void
+  onRotatePage: (pageNum: number, angle: number) => void
+  onInsertBlankPage: (beforePageNum: number) => void
 }
 
 export default function PdfPageRenderer({
-  pdfDoc, pageNumber, scale, tool, activeColor, activeFont, setActiveColor, setActiveFont,
+  pdfDoc, pageNumber, totalPages, scale, tool, activeColor, activeFont, setActiveColor, setActiveFont,
   docFonts, docColors, extractedItems, annotations, textEdits, selectedId,
-  onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation, onSelectAnnotation, onTextEdit
+  onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation, onSelectAnnotation, onTextEdit,
+  onDeletePage, onRotatePage, onInsertBlankPage
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
@@ -118,54 +123,106 @@ export default function PdfPageRenderer({
   const estimatedWidth = canvasWidth || (800 * (scale / 1.25))
 
   return (
-    <div
-      ref={wrapperRef}
-      className="canvas-wrapper"
-      style={{
-        width: estimatedWidth,
-        height: estimatedHeight,
-        marginBottom: '24px',
-        background: 'white' // Shows a white placeholder while loading
-      }}
-    >
-      {isVisible && (
-        <canvas ref={canvasRef} style={{ display: 'block', width: canvasWidth || '100%', height: canvasHeight || '100%' }} />
-      )}
-      <AnnotationLayer
-        canvasWidth={canvasWidth}
-        canvasHeight={canvasHeight}
-        annotations={annotations}
-        tool={tool}
-        page={pageNumber}
-        scale={scale}
-        activeColor={activeColor}
-        onAddAnnotation={onAddAnnotation}
-        onUpdateAnnotation={onUpdateAnnotation}
-        onDeleteAnnotation={onDeleteAnnotation}
-        onSelectAnnotation={onSelectAnnotation}
-        selectedId={selectedId}
-      />
-      {pdfPage && pdfViewport && (
-        <TextEditLayer
-          pdfPage={pdfPage}
-          viewport={pdfViewport}
-          scale={scale}
-          page={pageNumber}
+    <div style={{ marginBottom: '24px', position: 'relative' }}>
+      {/* Page Actions Bar */}
+      <div className="page-actions-bar">
+        <span className="page-actions-label">Page {pageNumber}</span>
+        <div className="page-actions-btns">
+          <button
+            className="page-action-btn"
+            title="Insert blank page before"
+            onClick={() => onInsertBlankPage(pageNumber)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="18" x2="12" y2="12" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </button>
+          <button
+            className="page-action-btn"
+            title="Rotate left"
+            onClick={() => onRotatePage(pageNumber, -90)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+          </button>
+          <button
+            className="page-action-btn"
+            title="Rotate right"
+            onClick={() => onRotatePage(pageNumber, 90)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
+            </svg>
+          </button>
+          <button
+            className="page-action-btn page-action-btn--danger"
+            title={totalPages <= 1 ? "Can't delete the only page" : "Delete this page"}
+            disabled={totalPages <= 1}
+            onClick={() => onDeletePage(pageNumber)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Canvas Wrapper */}
+      <div
+        ref={wrapperRef}
+        className="canvas-wrapper"
+        style={{
+          width: estimatedWidth,
+          height: estimatedHeight,
+          background: 'white'
+        }}
+      >
+        {isVisible && (
+          <canvas ref={canvasRef} style={{ display: 'block', width: canvasWidth || '100%', height: canvasHeight || '100%' }} />
+        )}
+        <AnnotationLayer
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
-          canvasRef={canvasRef}
-          textEdits={textEdits}
-          onTextEdit={onTextEdit}
+          annotations={annotations}
           tool={tool}
-          extractedItems={extractedItems}
+          page={pageNumber}
+          scale={scale}
           activeColor={activeColor}
-          activeFont={activeFont}
-          setActiveColor={setActiveColor}
-          setActiveFont={setActiveFont}
-          docFonts={docFonts}
-          docColors={docColors}
+          onAddAnnotation={onAddAnnotation}
+          onUpdateAnnotation={onUpdateAnnotation}
+          onDeleteAnnotation={onDeleteAnnotation}
+          onSelectAnnotation={onSelectAnnotation}
+          selectedId={selectedId}
         />
-      )}
+        {pdfPage && pdfViewport && (
+          <TextEditLayer
+            pdfPage={pdfPage}
+            viewport={pdfViewport}
+            scale={scale}
+            page={pageNumber}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            canvasRef={canvasRef}
+            textEdits={textEdits}
+            onTextEdit={onTextEdit}
+            tool={tool}
+            extractedItems={extractedItems}
+            activeColor={activeColor}
+            activeFont={activeFont}
+            setActiveColor={setActiveColor}
+            setActiveFont={setActiveFont}
+            docFonts={docFonts}
+            docColors={docColors}
+          />
+        )}
+      </div>
     </div>
   )
 }

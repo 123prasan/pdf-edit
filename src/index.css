@@ -1976,3 +1976,70 @@ select.input-sm {
     text-align: center;
   }
 }
+
+/* ---------- Page Actions Bar ---------- */
+.page-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-default);
+  padding: 6px 12px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin-bottom: -1px; /* seamless connection with the canvas wrapper */
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+  z-index: 10;
+  position: relative;
+}
+
+.page-actions-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.page-actions-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.page-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.page-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-action-btn--danger {
+  color: var(--danger);
+}
+
+.page-action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.canvas-wrapper {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+}
