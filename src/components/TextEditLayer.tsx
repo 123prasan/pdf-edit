@@ -284,8 +284,9 @@ export default function TextEditLayer({
     const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
     if (!span) return
 
-    // DON'T call preventDefault or setPointerCapture yet!
-    // Wait until we confirm it's a drag (not a scroll) in handlePointerMove
+    e.preventDefault()
+    e.stopPropagation()
+
     const left = parseFloat(span.style.left || '0')
     const top = parseFloat(span.style.top || '0')
 
@@ -299,11 +300,10 @@ export default function TextEditLayer({
       moved: false,
       isEditedDiv,
       pointerId: e.pointerId,
-      captured: false
+      captured: true
     }
+    try { span.setPointerCapture(e.pointerId) } catch (_) { }
   }, [active, editingItem])
-
-  const DRAG_THRESHOLD = 5 // pixels before we commit to a drag
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
@@ -312,18 +312,9 @@ export default function TextEditLayer({
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
 
-    // If we haven't committed to dragging yet, wait for threshold
-    if (!d.captured) {
-      if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return
-
-      // Commit to drag: capture pointer
-      try {
-        d.span.setPointerCapture(d.pointerId)
-      } catch (_) { }
-      d.captured = true
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      d.moved = true
     }
-
-    d.moved = true
 
     let newLeft = d.spanLeft + dx
     let newTop = d.spanTop + dy
