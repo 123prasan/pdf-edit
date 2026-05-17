@@ -78,6 +78,6 @@ export function useExtractedText(pdfFile: File | null) {
       isMounted = false;
     };
   }, [pdfFile]);
-
+  //
   return { data, embeddedFonts, loading, error };
 }
