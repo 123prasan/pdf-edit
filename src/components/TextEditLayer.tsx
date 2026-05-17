@@ -548,7 +548,7 @@ export default function TextEditLayer({
       style={{
         position: 'absolute', top: 0, left: 0, width: canvasWidth, height: canvasHeight,
         zIndex: active ? 15 : 3, pointerEvents: active ? 'auto' : 'none',
-        touchAction: 'none',
+        touchAction: 'auto',
         cursor: tool === 'text' ? 'text' : (active ? 'default' : 'auto')
       }}
       onDoubleClick={handleDoubleClick}

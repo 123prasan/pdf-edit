@@ -325,7 +325,7 @@ export default function AnnotationLayer({
         height: canvasHeight,
         cursor: cursorStyle,
         pointerEvents: isEditMode ? 'none' : 'auto',
-        touchAction: 'none',
+        touchAction: 'auto',
       }}
       onMouseDown={handleLayerMouseDown}
       onMouseMove={handleLayerMouseMove}

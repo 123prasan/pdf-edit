@@ -24,7 +24,6 @@ interface Props {
   onSelectAnnotation: (id: string | null) => void
   onTextEdit: (edit: any) => void
   onDeletePage: (pageNum: number) => void
-  onRotatePage: (pageNum: number, angle: number) => void
   onInsertBlankPage: (beforePageNum: number) => void
 }
 
@@ -32,7 +31,7 @@ export default function PdfPageRenderer({
   pdfDoc, pageNumber, totalPages, scale, tool, activeColor, activeFont, setActiveColor, setActiveFont,
   docFonts, docColors, extractedItems, annotations, textEdits, selectedId,
   onAddAnnotation, onUpdateAnnotation, onDeleteAnnotation, onSelectAnnotation, onTextEdit,
-  onDeletePage, onRotatePage, onInsertBlankPage
+  onDeletePage, onInsertBlankPage
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
@@ -52,7 +51,7 @@ export default function PdfPageRenderer({
           observer.disconnect()
         }
       },
-      { rootMargin: '500px 0px' } // Load slightly before it comes into view
+      { rootMargin: '500px 0px' }
     )
 
     if (wrapperRef.current) {
@@ -84,7 +83,6 @@ export default function PdfPageRenderer({
         const canvas = canvasRef.current
         if (!canvas) return
 
-        // Use devicePixelRatio * 2 for ultra-crisp rendering on Retina/mobile screens
         const pixelRatio = (window.devicePixelRatio || 1) * 2
         canvas.width = Math.floor(vp.width * pixelRatio)
         canvas.height = Math.floor(vp.height * pixelRatio)
@@ -118,7 +116,6 @@ export default function PdfPageRenderer({
     }
   }, [pdfDoc, pageNumber, scale, isVisible])
 
-  // Use an estimated height until rendered to maintain scroll position
   const estimatedHeight = canvasHeight || (1000 * (scale / 1.25))
   const estimatedWidth = canvasWidth || (800 * (scale / 1.25))
 
@@ -138,26 +135,6 @@ export default function PdfPageRenderer({
               <polyline points="14 2 14 8 20 8" />
               <line x1="12" y1="18" x2="12" y2="12" />
               <line x1="9" y1="15" x2="15" y2="15" />
-            </svg>
-          </button>
-          <button
-            className="page-action-btn"
-            title="Rotate left"
-            onClick={() => onRotatePage(pageNumber, -90)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-          </button>
-          <button
-            className="page-action-btn"
-            title="Rotate right"
-            onClick={() => onRotatePage(pageNumber, 90)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
             </svg>
           </button>
           <button

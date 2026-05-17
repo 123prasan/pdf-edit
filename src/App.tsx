@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf'
-import { PDFDocument, degrees } from 'pdf-lib'
+import { PDFDocument } from 'pdf-lib'
 import type { TextEdit } from './components/TextEditLayer'
 import PdfPageRenderer from './components/PdfPageRenderer'
 import {
@@ -586,7 +586,6 @@ export default function App() {
     setHistory([[]])
     setHistoryIndex(0)
     setSelectedId(null)
-    setPdfReady(prev => prev + 1)
   }, [])
 
   const deletePage = useCallback(async (pageNum: number) => {
@@ -599,30 +598,14 @@ export default function App() {
       doc.removePage(pageNum - 1) // 0-indexed
       const saved = await doc.save()
       const newBytes = new Uint8Array(saved)
-      setCurrentPage(p => Math.min(p, numPages - 1))
+      if (currentPage > numPages - 1) setCurrentPage(numPages - 1)
       await reloadPdfFromBytes(newBytes)
       showToast(`Deleted page ${pageNum}`)
     } catch (err) {
       console.error(err)
       showToast('Failed to delete page')
     }
-  }, [pdfBytes, numPages, reloadPdfFromBytes, showToast])
-
-  const rotatePage = useCallback(async (pageNum: number, angle: number) => {
-    if (!pdfBytes) return
-    try {
-      const doc = await PDFDocument.load(pdfBytes)
-      const page = doc.getPage(pageNum - 1)
-      const currentRotation = page.getRotation().angle
-      page.setRotation(degrees(currentRotation + angle))
-      const saved = await doc.save()
-      await reloadPdfFromBytes(new Uint8Array(saved))
-      showToast(`Rotated page ${pageNum} by ${angle}°`)
-    } catch (err) {
-      console.error(err)
-      showToast('Failed to rotate page')
-    }
-  }, [pdfBytes, reloadPdfFromBytes, showToast])
+  }, [pdfBytes, numPages, currentPage, reloadPdfFromBytes, showToast])
 
   const insertBlankPage = useCallback(async (beforePageNum: number) => {
     if (!pdfBytes) return
@@ -971,7 +954,6 @@ export default function App() {
                       onDeleteAnnotation={deleteAnnotation}
                       onSelectAnnotation={setSelectedId}
                       onDeletePage={deletePage}
-                      onRotatePage={rotatePage}
                       onInsertBlankPage={insertBlankPage}
                       onTextEdit={(edit) => {
                         setTextEdits(prev => {
