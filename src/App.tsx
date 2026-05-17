@@ -15,6 +15,67 @@ import { useExtractedText } from './hooks/useExtractedText'
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
 
 /* ============================================================
+   AdSlot — reusable Google AdSense ad unit
+   Replace data-ad-slot values with your actual AdSense slot IDs
+   ============================================================ */
+declare global {
+  interface Window { adsbygoogle: any[] }
+}
+
+function AdSlot({ format = 'auto', slot, className = '' }: { format?: string; slot: string; className?: string }) {
+  const adRef = React.useRef<HTMLDivElement>(null)
+  const pushed = React.useRef(false)
+  React.useEffect(() => {
+    if (pushed.current) return
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({})
+      pushed.current = true
+    } catch (e) { /* adblock or no adsense */ }
+  }, [])
+  return (
+    <div ref={adRef} className={`ad-slot ${className}`}>
+      <ins className="adsbygoogle"
+        style={{ display: 'block' }}
+        data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+        data-ad-slot={slot}
+        data-ad-format={format}
+        data-full-width-responsive="true"
+      />
+    </div>
+  )
+}
+
+/* ============================================================
+   ExportInterstitial — 5-second fullscreen ad after export
+   ============================================================ */
+function ExportInterstitial({ onClose }: { onClose: () => void }) {
+  const [countdown, setCountdown] = React.useState(5)
+  React.useEffect(() => {
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
+  return (
+    <div className="interstitial-overlay">
+      <div className="interstitial-card">
+        <div className="interstitial-header">
+          <span className="interstitial-badge">✓ PDF Exported Successfully!</span>
+          {countdown <= 0 ? (
+            <button className="btn-primary interstitial-close" onClick={onClose}>Continue Editing</button>
+          ) : (
+            <span className="interstitial-timer">Continue in {countdown}s</span>
+          )}
+        </div>
+        <div className="interstitial-ad">
+          <AdSlot slot="INTERSTITIAL_SLOT_ID" format="rectangle" className="ad-interstitial" />
+        </div>
+        <p className="interstitial-hint">Your edited PDF has been downloaded</p>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
    PdfLoadingStep — animated step indicator used in loading overlay
    ============================================================ */
 function PdfLoadingStep({ text, delay }: { text: string; delay: number }) {
@@ -153,6 +214,7 @@ export default function App() {
   const [pdfReady, setPdfReady] = useState(0)           // bumped each time a new PDF doc is loaded
   const [serverDocId, setServerDocId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [showInterstitial, setShowInterstitial] = useState(false)
 
   // Keep pdfBytesRef in sync
   useEffect(() => {
@@ -382,6 +444,7 @@ export default function App() {
       a.click()
       URL.revokeObjectURL(url)
       showToast('PDF exported securely with pixel-perfect accuracy!')
+      setShowInterstitial(true) // Show ad interstitial after export
     } catch (err) {
       console.error(err)
       showToast('Export failed. Make sure server is running.')
@@ -535,6 +598,11 @@ export default function App() {
 
       {/* Toast */}
       <div className={`toast ${toastMsg ? 'show' : ''}`}>{toastMsg}</div>
+
+      {/* Post-export interstitial ad */}
+      {showInterstitial && (
+        <ExportInterstitial onClose={() => setShowInterstitial(false)} />
+      )}
 
       {/* Hidden file input */}
       <input
@@ -720,6 +788,9 @@ export default function App() {
               <div className="feature-card"><div className="feature-icon fi-rose"><IconDownload /></div><h3>Export PDF</h3><p>Download with all changes permanently saved</p></div>
             </div>
 
+            {/* Ad: In-feed native between features and trust */}
+            <AdSlot slot="LANDING_INFEED_SLOT_ID" format="fluid" className="ad-landing-infeed" />
+
             <div className="trust-section">
               <div className="trust-item"><strong>100%</strong><span>Browser-based</span></div>
               <div className="trust-divider" />
@@ -729,6 +800,9 @@ export default function App() {
               <div className="trust-divider" />
               <div className="trust-item"><strong>Secure</strong><span>Files stay private</span></div>
             </div>
+
+            {/* Ad: Banner above footer */}
+            <AdSlot slot="LANDING_BANNER_SLOT_ID" format="auto" className="ad-landing-banner" />
 
             <footer className="landing-footer">
               <p>Built with care · Your files never leave your browser</p>

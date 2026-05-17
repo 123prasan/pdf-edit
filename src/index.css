@@ -1617,3 +1617,112 @@ select.input-sm {
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
   transform: scale(1.1);
 }
+
+/* ============================================================
+   Ad Slot Styles
+   ============================================================ */
+.ad-slot {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 50px;
+}
+
+.ad-landing-infeed {
+  margin: 8px 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.ad-landing-banner {
+  margin: 12px 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* ============================================================
+   Export Interstitial Overlay
+   ============================================================ */
+.interstitial-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(248, 250, 252, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInUp 0.3s var(--ease-out);
+}
+
+.interstitial-card {
+  background: #fff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  width: min(520px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.1);
+  animation: float-up 0.4s var(--ease-out);
+}
+
+.interstitial-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.interstitial-badge {
+  font-size: 15px;
+  font-weight: 600;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.interstitial-timer {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.interstitial-close {
+  padding: 8px 20px;
+  font-size: 13px;
+}
+
+.interstitial-ad {
+  width: 100%;
+  min-height: 250px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.interstitial-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .interstitial-card {
+    padding: 20px;
+  }
+  .interstitial-header {
+    flex-direction: column;
+    text-align: center;
+  }
+}
