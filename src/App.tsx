@@ -344,7 +344,7 @@ export default function App() {
       formData.append('textEdits', JSON.stringify(textEdits))
       formData.append('scale', scale.toString())
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const API_URL = import.meta.env.VITE_API_URL || 'https://pdfstudiio.onrender.com/'
       const res = await fetch(`${API_URL}/export`, {
         method: 'POST',
         body: formData
