@@ -233,6 +233,8 @@ export default function TextEditLayer({
     span: HTMLElement
     moved: boolean
     isEditedDiv: boolean
+    pointerId: number
+    captured: boolean
   } | null>(null)
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -282,9 +284,8 @@ export default function TextEditLayer({
     const span = isEditedDiv ? target : target.closest('[data-item-index]') as HTMLElement
     if (!span) return
 
-    e.preventDefault()
-    e.stopPropagation()
-
+    // DON'T call preventDefault or setPointerCapture yet!
+    // Wait until we confirm it's a drag (not a scroll) in handlePointerMove
     const left = parseFloat(span.style.left || '0')
     const top = parseFloat(span.style.top || '0')
 
@@ -296,10 +297,13 @@ export default function TextEditLayer({
       spanTop: top,
       span,
       moved: false,
-      isEditedDiv
+      isEditedDiv,
+      pointerId: e.pointerId,
+      captured: false
     }
-    span.setPointerCapture(e.pointerId)
   }, [active, editingItem])
+
+  const DRAG_THRESHOLD = 8 // pixels before we commit to a drag
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
@@ -307,29 +311,47 @@ export default function TextEditLayer({
 
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
+    const distance = Math.abs(dx) + Math.abs(dy)
 
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-      d.moved = true
+    // If we haven't committed to dragging yet
+    if (!d.captured) {
+      if (distance < DRAG_THRESHOLD) return // not enough movement yet
 
-      let newLeft = d.spanLeft + dx
-      let newTop = d.spanTop + dy
+      // If the movement is mostly vertical, it's probably a scroll — cancel drag
+      if (Math.abs(dy) > Math.abs(dx) * 2) {
+        dragRef.current = null
+        return
+      }
 
-      const spanW = d.span.offsetWidth || 0
-      const spanH = d.span.offsetHeight || 0
-
-      newLeft = Math.max(0, Math.min(newLeft, canvasWidth - spanW))
-      newTop = Math.max(0, Math.min(newTop, canvasHeight - spanH))
-
-      d.span.style.left = `${newLeft}px`
-      d.span.style.top = `${newTop}px`
+      // Commit to drag: capture pointer and prevent default
+      try {
+        d.span.setPointerCapture(d.pointerId)
+      } catch (_) { }
+      d.captured = true
     }
+
+    d.moved = true
+
+    let newLeft = d.spanLeft + dx
+    let newTop = d.spanTop + dy
+
+    const spanW = d.span.offsetWidth || 0
+    const spanH = d.span.offsetHeight || 0
+
+    newLeft = Math.max(0, Math.min(newLeft, canvasWidth - spanW))
+    newTop = Math.max(0, Math.min(newTop, canvasHeight - spanH))
+
+    d.span.style.left = `${newLeft}px`
+    d.span.style.top = `${newTop}px`
   }, [active, canvasWidth, canvasHeight])
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
     if (!d) return
     dragRef.current = null
-    d.span.releasePointerCapture(e.pointerId)
+    if (d.captured) {
+      try { d.span.releasePointerCapture(e.pointerId) } catch (_) { }
+    }
 
     if (d.moved) {
       const rawItem = textItemsRef.current[d.idx]
