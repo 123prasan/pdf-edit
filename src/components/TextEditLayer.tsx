@@ -187,6 +187,7 @@ export default function TextEditLayer({
             visibility: ${isEditedText ? 'hidden' : 'visible'};
             pointer-events: ${active ? 'auto' : 'none'};
             user-select: none;
+            touch-action: none;
           `
           if (active) {
             span.title = 'Double click to edit, drag to move'

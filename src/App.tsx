@@ -589,7 +589,10 @@ export default function App() {
     setHistory([[]])
     setHistoryIndex(0)
     setSelectedId(null)
-  }, [])
+    // Create a new File object so useExtractedText re-extracts for the new page structure
+    const newFile = new File([newBytes], fileName || 'document.pdf', { type: 'application/pdf' })
+    setPdfFileObj(newFile)
+  }, [fileName])
 
   const deletePage = useCallback(async (pageNum: number) => {
     if (!pdfBytes || numPages <= 1) {
