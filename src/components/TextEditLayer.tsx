@@ -687,6 +687,36 @@ export default function TextEditLayer({
 
             <button
               className="text-edit-btn"
+              onClick={() => {
+                const newIdx = -Date.now()
+                onTextEdit({
+                  id: `te_${page}_${newIdx}`,
+                  page,
+                  itemIndex: newIdx,
+                  originalText: '',
+                  newText: editingItem.text,
+                  bounds: {
+                    ...editingItem.bounds,
+                    y: Math.min(editingItem.bounds.y + editingItem.bounds.h + 5, canvasHeight - editingItem.bounds.h),
+                  },
+                  fontSize: editingItem.fontSize,
+                  fontFamily: editingItem.fontFamily,
+                  fontWeight: editingItem.fontWeight,
+                  fontStyle: editingItem.fontStyle,
+                  color: editingItem.color,
+                  transform: editingItem.transform,
+                  letterSpacing: editingItem.letterSpacing,
+                  pageHeight: editingItem.pageHeight,
+                })
+                commitEdit()
+              }}
+              title="Duplicate text"
+            >
+              ⧉
+            </button>
+
+            <button
+              className="text-edit-btn"
               style={{ color: 'var(--danger)' }}
               onClick={() => {
                 setEditingItem({ ...editingItem, text: '' })
