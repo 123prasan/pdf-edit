@@ -196,7 +196,8 @@ body {
   white-space: nowrap;
 }
 
-.text-edit-toolbar select, .text-edit-toolbar input[type="number"] {
+.text-edit-toolbar select,
+.text-edit-toolbar input[type="number"] {
   padding: 2px 4px;
   font-size: 11px;
   border: 1px solid var(--border-default);
@@ -212,7 +213,8 @@ body {
   max-width: 90px;
 }
 
-.text-edit-toolbar select:focus, .text-edit-toolbar input[type="number"]:focus {
+.text-edit-toolbar select:focus,
+.text-edit-toolbar input[type="number"]:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
 }

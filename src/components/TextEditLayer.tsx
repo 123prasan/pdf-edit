@@ -694,7 +694,7 @@ export default function TextEditLayer({
               position: 'absolute',
               left: editingItem.bounds.x,
               top: editingItem.bounds.y,
-              minWidth: editingItem.bounds.w,
+              minWidth: 20,
               fontSize: editingItem.fontSize * (canvasHeight / (editingItem.pageHeight || canvasHeight)), // EXACT SCALE Y
               fontFamily: editingItem.fontFamily,
               fontWeight: editingItem.fontWeight,
