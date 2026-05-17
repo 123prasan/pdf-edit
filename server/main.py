@@ -447,69 +447,76 @@ async def export_pdf(
                 annot.set_border(width=width)
                 annot.update()
 
+        edits_by_page = {}
         for edit in edits:
             page_num = int(edit.get("page", 1)) - 1
             if page_num < 0 or page_num >= len(doc):
                 continue
-            page = doc[page_num]
-            
-            bounds = edit.get("bounds")
-            orig_bounds = edit.get("originalBounds") or bounds
-            
-            if orig_bounds and edit.get("itemIndex", -1) >= 0:
-                rect = fitz.Rect(
-                    orig_bounds["x"] / scale,
-                    orig_bounds["y"] / scale,
-                    (orig_bounds["x"] + orig_bounds["w"]) / scale,
-                    (orig_bounds["y"] + orig_bounds["h"]) / scale
-                )
-                page.draw_rect(rect, color=None, fill=(1, 1, 1), overlay=True)
-            
-            new_text = edit.get("newText", "")
-            if not new_text.strip():
-                continue
-            
-            font_size = edit.get("fontSize", 12)
-            rgb = hex_to_rgb(edit.get("color", "#000000"))
-            
-            fontname = "helv"
-            family = edit.get("fontFamily", "").lower()
-            if "times" in family or "serif" in family:
-                fontname = "tiro"
-            elif "courier" in family or "mono" in family:
-                fontname = "cour"
-                
-            if edit.get("fontWeight") == "bold":
-                if edit.get("fontStyle") == "italic":
-                    fontname = fontname.replace("ro", "bi").replace("helv", "hebi").replace("cour", "cobi")
-                else:
-                    fontname = fontname.replace("ro", "bo").replace("helv", "hebo").replace("cour", "cobo")
-            elif edit.get("fontStyle") == "italic":
-                fontname = fontname.replace("ro", "it").replace("helv", "heit").replace("cour", "coit")
+            if page_num not in edits_by_page:
+                edits_by_page[page_num] = []
+            edits_by_page[page_num].append(edit)
 
-            if bounds:
-                # Expand the box massively so PyMuPDF never rejects it due to tight browser DOM bounds
-                insert_rect = fitz.Rect(
-                    bounds["x"] / scale,
-                    bounds["y"] / scale,
-                    (bounds["x"] + bounds["w"]) / scale + 500,
-                    (bounds["y"] + bounds["h"]) / scale + 500
-                )
-                print(f"DEBUG: inserting text '{new_text}' with fontname '{fontname}'")
-                try:
-                    page.insert_textbox(insert_rect, new_text, fontname=fontname, fontsize=font_size, color=rgb, align=0)
-                except Exception as ex:
-                    print(f"DEBUG: insert_textbox failed: {ex}")
-                    # Fallback 1: Force helv
+        for page_num, page_edits in edits_by_page.items():
+            page = doc[page_num]
+
+            # Step 1: Redact original text bounds (removes text without drawing a white box)
+            has_redactions = False
+            for edit in page_edits:
+                bounds = edit.get("bounds")
+                orig_bounds = edit.get("originalBounds") or bounds
+                if orig_bounds and edit.get("itemIndex", -1) >= 0:
+                    rect = fitz.Rect(
+                        orig_bounds["x"] / scale,
+                        orig_bounds["y"] / scale,
+                        (orig_bounds["x"] + orig_bounds["w"]) / scale,
+                        (orig_bounds["y"] + orig_bounds["h"]) / scale
+                    )
+                    page.add_redact_annot(rect, fill=None)
+                    has_redactions = True
+            
+            if has_redactions:
+                page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+
+            # Step 2: Draw the new text
+            for edit in page_edits:
+                bounds = edit.get("bounds")
+                new_text = edit.get("newText", "")
+                if not new_text.strip():
+                    continue
+                
+                font_size = edit.get("fontSize", 12)
+                rgb = hex_to_rgb(edit.get("color", "#000000"))
+                
+                fontname = "helv"
+                family = edit.get("fontFamily", "").lower()
+                if "times" in family or "serif" in family:
+                    fontname = "tiro"
+                elif "courier" in family or "mono" in family:
+                    fontname = "cour"
+                    
+                if edit.get("fontWeight") == "bold":
+                    if edit.get("fontStyle") == "italic":
+                        fontname = fontname.replace("ro", "bi").replace("helv", "hebi").replace("cour", "cobi")
+                    else:
+                        fontname = fontname.replace("ro", "bo").replace("helv", "hebo").replace("cour", "cobo")
+                elif edit.get("fontStyle") == "italic":
+                    fontname = fontname.replace("ro", "it").replace("helv", "heit").replace("cour", "coit")
+
+                if bounds:
+                    insert_rect = fitz.Rect(
+                        bounds["x"] / scale,
+                        bounds["y"] / scale,
+                        (bounds["x"] + bounds["w"]) / scale + 500,
+                        (bounds["y"] + bounds["h"]) / scale + 500
+                    )
                     try:
-                        print("DEBUG: Retrying with standard 'helv'")
-                        page.insert_textbox(insert_rect, new_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
-                    except Exception as ex2:
-                        print(f"DEBUG: Fallback 1 failed: {ex2}")
-                        # Fallback 2: Encode to ascii
-                        safe_text = new_text.encode("ascii", "ignore").decode("ascii")
-                        print(f"DEBUG: Retrying with safe ascii text '{safe_text}'")
-                        page.insert_textbox(insert_rect, safe_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+                        page.insert_textbox(insert_rect, new_text, fontname=fontname, fontsize=font_size, color=rgb, align=0)
+                    except Exception as ex:
+                        try:
+                            page.insert_textbox(insert_rect, new_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
+                        except Exception:
+                            safe_text = new_text.encode("ascii", "ignore").decode("ascii")
+                            page.insert_textbox(insert_rect, safe_text, fontname="helv", fontsize=font_size, color=rgb, align=0)
 
         out_bytes = doc.write()
         doc.close()

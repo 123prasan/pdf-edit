@@ -248,10 +248,10 @@ export default function App() {
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     const pingServer = () => fetch(`${API_URL}/health`).catch(() => {/* silently ignore */ })
-    
+
     // Initial ping
     pingServer()
-    
+
     // Ping every 5 minutes to prevent Render from spinning down the free instance
     const interval = setInterval(pingServer, 5 * 60 * 1000)
     return () => clearInterval(interval)
