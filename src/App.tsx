@@ -547,47 +547,68 @@ export default function App() {
 
       {/* ============ HEADER — only when editing ============ */}
       {pdfBytes && (
-      <header className="app-header">
-        <div className="app-logo">
-          <IconPDF />
-          <span>PDF Studio</span>
-        </div>
+        <header className="app-header">
+          <div className="app-logo">
+            <IconPDF />
+            <span>PDF Studio</span>
+          </div>
 
-        {(docColors.length > 0 || docFonts.length > 0) && (
-          <div className="doc-palette-header" style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, paddingLeft: '32px' }}>
+          {(docColors.length > 0 || docFonts.length > 0) && (
+            <div className="doc-palette-header" style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, paddingLeft: '32px' }}>
 
-            <div style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Colors
-                </span>
-                <button
-                  onClick={() => setShowColorPicker(!showColorPicker)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)',
-                    background: 'var(--bg-primary)', cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)'
-                  }}
-                >
-                  <div style={{ width: 14, height: 14, borderRadius: '50%', background: activeColor || '#000', border: '1px solid var(--border-default)' }} />
-                  {activeColor || 'Select'}
-                </button>
-              </div>
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Colors
+                  </span>
+                  <button
+                    onClick={() => setShowColorPicker(!showColorPicker)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)',
+                      background: 'var(--bg-primary)', cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)'
+                    }}
+                  >
+                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: activeColor || '#000', border: '1px solid var(--border-default)' }} />
+                    {activeColor || 'Select'}
+                  </button>
+                </div>
 
-              {showColorPicker && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, marginTop: '8px', zIndex: 100,
-                  background: 'var(--bg-primary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
-                  padding: '16px', boxShadow: 'var(--shadow-lg)', width: '280px',
-                  display: 'flex', flexDirection: 'column', gap: '16px'
-                }}>
-                  {docColors.length > 0 && (
+                {showColorPicker && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, marginTop: '8px', zIndex: 100,
+                    background: 'var(--bg-primary)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
+                    padding: '16px', boxShadow: 'var(--shadow-lg)', width: '280px',
+                    display: 'flex', flexDirection: 'column', gap: '16px'
+                  }}>
+                    {docColors.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                          Document Colors
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
+                          {docColors.map(c => (
+                            <div
+                              key={c}
+                              onClick={() => { setActiveColor(c); setShowColorPicker(false); }}
+                              style={{
+                                width: 20, height: 20, borderRadius: 4, background: c,
+                                border: activeColor === c ? '2px solid var(--accent)' : '1px solid var(--border-default)',
+                                cursor: 'pointer', boxShadow: activeColor === c ? '0 0 0 2px rgba(26,115,232,0.2)' : 'none'
+                              }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                        Document Colors
+                        All Other Colors
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
-                        {docColors.map(c => (
+                        {STANDARD_COLORS.map(c => (
                           <div
                             key={c}
                             onClick={() => { setActiveColor(c); setShowColorPicker(false); }}
@@ -601,64 +622,43 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                  )}
-
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                      All Other Colors
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '6px' }}>
-                      {STANDARD_COLORS.map(c => (
-                        <div
-                          key={c}
-                          onClick={() => { setActiveColor(c); setShowColorPicker(false); }}
-                          style={{
-                            width: 20, height: 20, borderRadius: 4, background: c,
-                            border: activeColor === c ? '2px solid var(--accent)' : '1px solid var(--border-default)',
-                            cursor: 'pointer', boxShadow: activeColor === c ? '0 0 0 2px rgba(26,115,232,0.2)' : 'none'
-                          }}
-                          title={c}
-                        />
-                      ))}
-                    </div>
                   </div>
+                )}
+              </div>
+
+              {docColors.length > 0 && docFonts.length > 0 && <div className="toolbar-sep" style={{ height: '20px', margin: '0' }} />}
+
+              {docFonts.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Document Fonts
+                  </span>
+                  <select
+                    className="input-sm"
+                    value={activeFont || ''}
+                    onChange={e => setActiveFont(e.target.value)}
+                    style={{ width: 140, padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}
+                  >
+                    {docFonts.map(f => (
+                      <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>
+          )}
 
-            {docColors.length > 0 && docFonts.length > 0 && <div className="toolbar-sep" style={{ height: '20px', margin: '0' }} />}
-
-            {docFonts.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Document Fonts
-                </span>
-                <select
-                  className="input-sm"
-                  value={activeFont || ''}
-                  onChange={e => setActiveFont(e.target.value)}
-                  style={{ width: 140, padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}
-                >
-                  {docFonts.map(f => (
-                    <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+          <div className="header-actions">
+            <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
+              <IconUpload />
+              <span className="hide-mobile">New PDF</span>
+            </button>
+            <button className={`btn-primary ${isExporting ? 'exporting' : ''}`} onClick={handleExport} disabled={!pdfBytes || isExporting}>
+              {isExporting ? <div className="spinner" /> : <IconDownload />}
+              <span className="hide-mobile">{isExporting ? 'Exporting...' : 'Export'}</span>
+            </button>
           </div>
-        )}
-
-        <div className="header-actions">
-          <button className="btn-ghost" onClick={() => fileInputRef.current?.click()}>
-            <IconUpload />
-            <span className="hide-mobile">New PDF</span>
-          </button>
-          <button className={`btn-primary ${isExporting ? 'exporting' : ''}`} onClick={handleExport} disabled={!pdfBytes || isExporting}>
-            {isExporting ? <div className="spinner" /> : <IconDownload />}
-            <span className="hide-mobile">{isExporting ? 'Exporting...' : 'Export'}</span>
-          </button>
-        </div>
-      </header>
+        </header>
       )}
 
       {/* Exporting Overlay */}
@@ -701,6 +701,8 @@ export default function App() {
             <h1 className="hero-title">Edit PDFs Online<br /><span className="hero-gradient">In Seconds</span></h1>
             <p className="hero-subtitle">Add text, shapes, highlights, annotations, and freehand drawings. Export pixel-perfect PDFs directly from your browser — no downloads, no accounts.</p>
 
+            <img src="/hero-illustration.svg" alt="Edit documents online" className="hero-illustration" />
+
             <div className={`drop-card ${dragOver ? 'drag-over' : ''}`} onClick={() => fileInputRef.current?.click()}>
               <div className="drop-icon"><IconUpload /></div>
               <div className="drop-title">Drop your PDF here</div>
@@ -732,317 +734,317 @@ export default function App() {
           </div>
         </div>
       ) : (
-      <div className="app-body">
+        <div className="app-body">
 
-        {/* ---- Left Sidebar ---- */}
-        <aside className="tools-sidebar">
-          <ToolBtn value="select" icon={<IconCursor />} label="Select (V)" />
-          <ToolBtn value="edit" icon={<IconEdit />} label="Edit Text (E)" />
-          <ToolBtn value="text" icon={<IconType />} label="Add Text (T)" />
-          <ToolBtn value="highlight" icon={<IconHighlighter />} label="Highlight (H)" />
-          <ToolBtn value="ink" icon={<IconPen />} label="Freehand (P)" />
-          <ToolBtn value="rect" icon={<IconSquare />} label="Rectangle" />
-          <ToolBtn value="ellipse" icon={<IconCircle />} label="Circle" />
-          <ToolBtn value="line" icon={<IconLine />} label="Line" />
-          <ToolBtn value="pan" icon={<IconHand />} label="Pan (G)" />
+          {/* ---- Left Sidebar ---- */}
+          <aside className="tools-sidebar">
+            <ToolBtn value="select" icon={<IconCursor />} label="Select (V)" />
+            <ToolBtn value="edit" icon={<IconEdit />} label="Edit Text (E)" />
+            <ToolBtn value="text" icon={<IconType />} label="Add Text (T)" />
+            <ToolBtn value="highlight" icon={<IconHighlighter />} label="Highlight (H)" />
+            <ToolBtn value="ink" icon={<IconPen />} label="Freehand (P)" />
+            <ToolBtn value="rect" icon={<IconSquare />} label="Rectangle" />
+            <ToolBtn value="ellipse" icon={<IconCircle />} label="Circle" />
+            <ToolBtn value="line" icon={<IconLine />} label="Line" />
+            <ToolBtn value="pan" icon={<IconHand />} label="Pan (G)" />
 
-          <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
+            <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
 
-          <button className="tool-btn" onClick={undo} disabled={historyIndex <= 0} title="Undo">
-            <IconUndo />
-          </button>
-          <button className="tool-btn" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo">
-            <IconRedo />
-          </button>
+            <button className="tool-btn" onClick={undo} disabled={historyIndex <= 0} title="Undo">
+              <IconUndo />
+            </button>
+            <button className="tool-btn" onClick={redo} disabled={historyIndex >= history.length - 1} title="Redo">
+              <IconRedo />
+            </button>
 
-          <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
+            <div style={{ width: '36px', height: '1px', background: 'var(--border-default)', margin: '8px 0' }} />
 
-          <button className="tool-btn" onClick={deleteSelected} disabled={!selectedId} title="Delete">
-            <IconTrash />
-          </button>
-        </aside>
+            <button className="tool-btn" onClick={deleteSelected} disabled={!selectedId} title="Delete">
+              <IconTrash />
+            </button>
+          </aside>
 
-        {/* ---- Main Canvas Area ---- */}
-        <div className="canvas-area">
-          {!pdfBytes ? null : (
-            <>
-              {/* Vertical Scroll PDF Container */}
-              <div className="canvas-scroll" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
-                {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
-                  <PdfPageRenderer
-                    key={pageNum}
-                    pdfDoc={pdfDocRef.current}
-                    pageNumber={pageNum}
-                    scale={scale}
-                    tool={tool}
-                    activeColor={activeColor}
-                    activeFont={activeFont}
-                    setActiveColor={setActiveColor}
-                    setActiveFont={setActiveFont}
-                    docFonts={docFonts}
-                    docColors={docColors}
-                    extractedItems={extractedItems}
-                    annotations={annotations.filter(a => a.page === pageNum)}
-                    textEdits={textEdits}
-                    selectedId={selectedId}
-                    onAddAnnotation={addAnnotation}
-                    onUpdateAnnotation={updateAnnotation}
-                    onDeleteAnnotation={deleteAnnotation}
-                    onSelectAnnotation={setSelectedId}
-                    onTextEdit={(edit) => {
-                      setTextEdits(prev => {
-                        const idx = prev.findIndex(e => e.id === edit.id)
-                        if (idx >= 0) {
-                          const updated = [...prev]
-                          updated[idx] = edit
-                          return updated
-                        }
-                        return [...prev, edit]
-                      })
+          {/* ---- Main Canvas Area ---- */}
+          <div className="canvas-area">
+            {!pdfBytes ? null : (
+              <>
+                {/* Vertical Scroll PDF Container */}
+                <div className="canvas-scroll" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
+                  {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
+                    <PdfPageRenderer
+                      key={pageNum}
+                      pdfDoc={pdfDocRef.current}
+                      pageNumber={pageNum}
+                      scale={scale}
+                      tool={tool}
+                      activeColor={activeColor}
+                      activeFont={activeFont}
+                      setActiveColor={setActiveColor}
+                      setActiveFont={setActiveFont}
+                      docFonts={docFonts}
+                      docColors={docColors}
+                      extractedItems={extractedItems}
+                      annotations={annotations.filter(a => a.page === pageNum)}
+                      textEdits={textEdits}
+                      selectedId={selectedId}
+                      onAddAnnotation={addAnnotation}
+                      onUpdateAnnotation={updateAnnotation}
+                      onDeleteAnnotation={deleteAnnotation}
+                      onSelectAnnotation={setSelectedId}
+                      onTextEdit={(edit) => {
+                        setTextEdits(prev => {
+                          const idx = prev.findIndex(e => e.id === edit.id)
+                          if (idx >= 0) {
+                            const updated = [...prev]
+                            updated[idx] = edit
+                            return updated
+                          }
+                          return [...prev, edit]
+                        })
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* ---- Right Properties Panel ---- */}
+          {pdfBytes && (
+            <aside className="props-panel">
+              <div>
+                <div className="props-section-title">Document</div>
+                <div className="props-row">
+                  <label>File</label>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {fileName || 'Untitled'}
+                  </span>
+                </div>
+                <div className="props-row">
+                  <label>Pages</label>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{numPages}</span>
+                </div>
+
+              </div>
+
+              <div>
+                <div className="props-section-title">Annotations ({annotations.filter(a => a.page === currentPage).length})</div>
+                {annotations.filter(a => a.page === currentPage).length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    No annotations on this page yet.<br />
+                    Select a tool and click on the canvas.
+                  </div>
+                )}
+                {annotations.filter(a => a.page === currentPage).map(ann => (
+                  <div
+                    key={ann.id}
+                    onClick={() => setSelectedId(ann.id)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: selectedId === ann.id ? 'var(--bg-hover)' : 'transparent',
+                      border: selectedId === ann.id ? '1px solid var(--border-hover)' : '1px solid transparent',
+                      cursor: 'pointer',
+                      marginBottom: 4,
+                      fontSize: 12,
+                      color: 'var(--text-secondary)',
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
                     }}
-                  />
+                  >
+                    <span style={{ textTransform: 'capitalize', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {ann.type}
+                    </span>
+                    {ann.type === 'text' && (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {ann.text || '(empty)'}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
-            </>
-          )}
-        </div>
 
-        {/* ---- Right Properties Panel ---- */}
-        {pdfBytes && (
-          <aside className="props-panel">
-            <div>
-              <div className="props-section-title">Document</div>
-              <div className="props-row">
-                <label>File</label>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {fileName || 'Untitled'}
-                </span>
-              </div>
-              <div className="props-row">
-                <label>Pages</label>
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{numPages}</span>
-              </div>
-
-            </div>
-
-            <div>
-              <div className="props-section-title">Annotations ({annotations.filter(a => a.page === currentPage).length})</div>
-              {annotations.filter(a => a.page === currentPage).length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  No annotations on this page yet.<br />
-                  Select a tool and click on the canvas.
-                </div>
-              )}
-              {annotations.filter(a => a.page === currentPage).map(ann => (
-                <div
-                  key={ann.id}
-                  onClick={() => setSelectedId(ann.id)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: selectedId === ann.id ? 'var(--bg-hover)' : 'transparent',
-                    border: selectedId === ann.id ? '1px solid var(--border-hover)' : '1px solid transparent',
-                    cursor: 'pointer',
-                    marginBottom: 4,
-                    fontSize: 12,
-                    color: 'var(--text-secondary)',
-                    transition: 'all 0.15s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ textTransform: 'capitalize', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {ann.type}
-                  </span>
-                  {ann.type === 'text' && (
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {ann.text || '(empty)'}
+              {/* Selected annotation properties */}
+              {selectedAnn && (
+                <div>
+                  <div className="props-section-title">Properties</div>
+                  <div className="props-row">
+                    <label>Type</label>
+                    <span style={{ fontSize: 12, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                      {selectedAnn.type}
                     </span>
+                  </div>
+
+                  {selectedAnn.type === 'text' && (
+                    <>
+                      <div className="props-row">
+                        <label>Font Size</label>
+                        <input
+                          type="number"
+                          className="input-sm input-sm-narrow"
+                          value={selectedAnn.fontSize || 14}
+                          min={8}
+                          max={72}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value)
+                            if (!isNaN(val)) {
+                              updateAnnotation(selectedAnn.id, { fontSize: val })
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="props-row">
+                        <label>Color</label>
+                        <input
+                          type="color"
+                          className="color-swatch"
+                          value={selectedAnn.fontColor || '#000000'}
+                          onChange={(e) => {
+                            updateAnnotation(selectedAnn.id, { fontColor: e.target.value })
+                          }}
+                        />
+                      </div>
+                    </>
                   )}
-                </div>
-              ))}
-            </div>
 
-            {/* Selected annotation properties */}
-            {selectedAnn && (
-              <div>
-                <div className="props-section-title">Properties</div>
-                <div className="props-row">
-                  <label>Type</label>
-                  <span style={{ fontSize: 12, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                    {selectedAnn.type}
-                  </span>
-                </div>
+                  {selectedAnn.type === 'highlight' && (
+                    <>
+                      <div className="props-row">
+                        <label>Color</label>
+                        <input
+                          type="color"
+                          className="color-swatch"
+                          value={selectedAnn.color || '#fbbf24'}
+                          onChange={(e) => {
+                            updateAnnotation(selectedAnn.id, { color: e.target.value })
+                          }}
+                        />
+                      </div>
+                      <div className="props-row">
+                        <label>Opacity</label>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={1}
+                          step={0.05}
+                          value={selectedAnn.opacity ?? 0.3}
+                          onChange={(e) => {
+                            updateAnnotation(selectedAnn.id, { opacity: parseFloat(e.target.value) })
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </>
+                  )}
 
-                {selectedAnn.type === 'text' && (
-                  <>
-                    <div className="props-row">
-                      <label>Font Size</label>
-                      <input
-                        type="number"
-                        className="input-sm input-sm-narrow"
-                        value={selectedAnn.fontSize || 14}
-                        min={8}
-                        max={72}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value)
-                          if (!isNaN(val)) {
-                            updateAnnotation(selectedAnn.id, { fontSize: val })
-                          }
-                        }}
-                      />
-                    </div>
+                  {selectedAnn.type === 'ink' && (
                     <div className="props-row">
                       <label>Color</label>
                       <input
                         type="color"
                         className="color-swatch"
-                        value={selectedAnn.fontColor || '#000000'}
+                        value={selectedAnn.fontColor || '#818cf8'}
                         onChange={(e) => {
                           updateAnnotation(selectedAnn.id, { fontColor: e.target.value })
                         }}
                       />
                     </div>
-                  </>
-                )}
+                  )}
 
-                {selectedAnn.type === 'highlight' && (
-                  <>
-                    <div className="props-row">
-                      <label>Color</label>
-                      <input
-                        type="color"
-                        className="color-swatch"
-                        value={selectedAnn.color || '#fbbf24'}
-                        onChange={(e) => {
-                          updateAnnotation(selectedAnn.id, { color: e.target.value })
-                        }}
-                      />
-                    </div>
-                    <div className="props-row">
-                      <label>Opacity</label>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={1}
-                        step={0.05}
-                        value={selectedAnn.opacity ?? 0.3}
-                        onChange={(e) => {
-                          updateAnnotation(selectedAnn.id, { opacity: parseFloat(e.target.value) })
-                        }}
-                        style={{ flex: 1 }}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {selectedAnn.type === 'ink' && (
-                  <div className="props-row">
-                    <label>Color</label>
-                    <input
-                      type="color"
-                      className="color-swatch"
-                      value={selectedAnn.fontColor || '#818cf8'}
-                      onChange={(e) => {
-                        updateAnnotation(selectedAnn.id, { fontColor: e.target.value })
-                      }}
-                    />
-                  </div>
-                )}
-
-                {(selectedAnn.type === 'rect' || selectedAnn.type === 'ellipse' || selectedAnn.type === 'line') && (
-                  <>
-                    <div className="props-row">
-                      <label>Stroke</label>
-                      <input
-                        type="color"
-                        className="color-swatch"
-                        value={selectedAnn.strokeColor || '#000000'}
-                        onChange={(e) => {
-                          updateAnnotation(selectedAnn.id, { strokeColor: e.target.value })
-                        }}
-                      />
-                    </div>
-                    {selectedAnn.type !== 'line' && (
+                  {(selectedAnn.type === 'rect' || selectedAnn.type === 'ellipse' || selectedAnn.type === 'line') && (
+                    <>
                       <div className="props-row">
-                        <label>Fill</label>
+                        <label>Stroke</label>
                         <input
                           type="color"
                           className="color-swatch"
-                          value={selectedAnn.fillColor || '#transparent'}
+                          value={selectedAnn.strokeColor || '#000000'}
                           onChange={(e) => {
-                            updateAnnotation(selectedAnn.id, { fillColor: e.target.value })
+                            updateAnnotation(selectedAnn.id, { strokeColor: e.target.value })
                           }}
                         />
                       </div>
-                    )}
-                    <div className="props-row">
-                      <label>Thickness</label>
-                      <input
-                        type="number"
-                        className="input-sm input-sm-narrow"
-                        value={selectedAnn.strokeWidth || 2}
-                        min={1}
-                        max={20}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value)
-                          if (!isNaN(val)) {
-                            updateAnnotation(selectedAnn.id, { strokeWidth: val })
-                          }
-                        }}
-                      />
-                    </div>
-                  </>
-                )}
+                      {selectedAnn.type !== 'line' && (
+                        <div className="props-row">
+                          <label>Fill</label>
+                          <input
+                            type="color"
+                            className="color-swatch"
+                            value={selectedAnn.fillColor || '#transparent'}
+                            onChange={(e) => {
+                              updateAnnotation(selectedAnn.id, { fillColor: e.target.value })
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="props-row">
+                        <label>Thickness</label>
+                        <input
+                          type="number"
+                          className="input-sm input-sm-narrow"
+                          value={selectedAnn.strokeWidth || 2}
+                          min={1}
+                          max={20}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value)
+                            if (!isNaN(val)) {
+                              updateAnnotation(selectedAnn.id, { strokeWidth: val })
+                            }
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
 
-                <div style={{ marginTop: 8 }}>
-                  <button className="btn-ghost" onClick={() => deleteAnnotation(selectedAnn.id)} style={{ color: 'var(--danger)', borderColor: 'rgba(248, 113, 113, 0.3)', width: '100%', justifyContent: 'center' }}>
-                    <IconTrash />
-                    Delete Annotation
-                  </button>
+                  <div style={{ marginTop: 8 }}>
+                    <button className="btn-ghost" onClick={() => deleteAnnotation(selectedAnn.id)} style={{ color: 'var(--danger)', borderColor: 'rgba(248, 113, 113, 0.3)', width: '100%', justifyContent: 'center' }}>
+                      <IconTrash />
+                      Delete Annotation
+                    </button>
+                  </div>
                 </div>
+              )}
+
+              {/* Keyboard shortcuts */}
+              <div style={{ marginTop: 'auto' }}>
+                <div className="props-section-title">Shortcuts</div>
+                {[
+                  ['V', 'Select'],
+                  ['E', 'Edit Text'],
+                  ['T', 'Add Text'],
+                  ['H', 'Highlight'],
+                  ['P', 'Freehand'],
+                  ['G', 'Pan'],
+                  ['Del', 'Delete'],
+                  ['Ctrl+Z', 'Undo'],
+                  ['Ctrl+Y', 'Redo'],
+                  ['+/-', 'Zoom'],
+                ].map(([key, desc]) => (
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>
+                    <span>{desc}</span>
+                    <kbd style={{ background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 4, fontSize: 10, color: 'var(--text-secondary)' }}>{key}</kbd>
+                  </div>
+                ))}
               </div>
-            )}
-
-            {/* Keyboard shortcuts */}
-            <div style={{ marginTop: 'auto' }}>
-              <div className="props-section-title">Shortcuts</div>
-              {[
-                ['V', 'Select'],
-                ['E', 'Edit Text'],
-                ['T', 'Add Text'],
-                ['H', 'Highlight'],
-                ['P', 'Freehand'],
-                ['G', 'Pan'],
-                ['Del', 'Delete'],
-                ['Ctrl+Z', 'Undo'],
-                ['Ctrl+Y', 'Redo'],
-                ['+/-', 'Zoom'],
-              ].map(([key, desc]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>
-                  <span>{desc}</span>
-                  <kbd style={{ background: 'var(--bg-tertiary)', padding: '1px 6px', borderRadius: 4, fontSize: 10, color: 'var(--text-secondary)' }}>{key}</kbd>
-                </div>
-              ))}
-            </div>
-          </aside>
-        )}
-      </div>
+            </aside>
+          )}
+        </div>
       )}
 
       {/* ============ STATUS BAR — only when editing ============ */}
       {pdfBytes && (
-      <div className="status-bar">
-        <div className="status-dot" />
-        <span>Ready</span>
-        <>
-          <span>|</span>
-          <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
-          <span>|</span>
-          <span>Page {currentPage}/{numPages}</span>
-        </>
-      </div>
+        <div className="status-bar">
+          <div className="status-dot" />
+          <span>Ready</span>
+          <>
+            <span>|</span>
+            <span>{annotations.length} annotation{annotations.length !== 1 ? 's' : ''}</span>
+            <span>|</span>
+            <span>Page {currentPage}/{numPages}</span>
+          </>
+        </div>
       )}
     </div >
   )
