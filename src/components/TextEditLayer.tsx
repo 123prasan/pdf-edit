@@ -303,7 +303,7 @@ export default function TextEditLayer({
     }
   }, [active, editingItem])
 
-  const DRAG_THRESHOLD = 8 // pixels before we commit to a drag
+  const DRAG_THRESHOLD = 5 // pixels before we commit to a drag
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
@@ -311,19 +311,12 @@ export default function TextEditLayer({
 
     const dx = e.clientX - d.startX
     const dy = e.clientY - d.startY
-    const distance = Math.abs(dx) + Math.abs(dy)
 
-    // If we haven't committed to dragging yet
+    // If we haven't committed to dragging yet, wait for threshold
     if (!d.captured) {
-      if (distance < DRAG_THRESHOLD) return // not enough movement yet
+      if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return
 
-      // If the movement is mostly vertical, it's probably a scroll — cancel drag
-      if (Math.abs(dy) > Math.abs(dx) * 2) {
-        dragRef.current = null
-        return
-      }
-
-      // Commit to drag: capture pointer and prevent default
+      // Commit to drag: capture pointer
       try {
         d.span.setPointerCapture(d.pointerId)
       } catch (_) { }
