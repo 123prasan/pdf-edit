@@ -230,7 +230,7 @@ export default function App() {
   const [pdfReady, setPdfReady] = useState(0)           // bumped each time a new PDF doc is loaded
   const [serverDocId, setServerDocId] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
-  const [showInterstitial, setShowInterstitial] = useState(false)
+  const [pendingDownload, setPendingDownload] = useState<{ url: string, filename: string } | null>(null)
 
   // Keep pdfBytesRef in sync
   useEffect(() => {
@@ -465,7 +465,7 @@ export default function App() {
 
       // Delay revoking so download has time to start (handled in interstitial now)
       setTimeout(() => URL.revokeObjectURL(url), 60000)
-      
+
       // Show interstitial which handles the download
       setPendingDownload({ url, filename })
       showToast('PDF exported securely with pixel-perfect accuracy!')
