@@ -427,13 +427,21 @@ async def extract_colors(file: UploadFile = File(...)):
                         if flags & 2 and font_style == "normal":
                             font_style = "italic"
 
+                        info = normalize_font_name(raw_font)
+                        stripped = re.sub(r'^[A-Z]{6}\+', '', raw_font)
+                        css_family = f'"{stripped}", {info["cssFamily"]}'
+
                         spans_list.append({
                             "str":        text,
                             "x":          round(bbox[0], 1),
                             "y":          round(bbox[1], 1),
+                            "width":      round(bbox[2] - bbox[0], 1),
+                            "height":     round(bbox[3] - bbox[1], 1),
                             "color":      f'#{color_int:06x}',
                             "fontWeight": font_weight,
                             "fontStyle":  font_style,
+                            "fontName":   raw_font,
+                            "fontFamily": css_family
                         })
 
             result["pages"][str(page_index + 1)] = spans_list

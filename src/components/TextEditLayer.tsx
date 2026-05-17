@@ -372,9 +372,9 @@ export default function TextEditLayer({
         originalText: rawItem?.str || '',
         newText: existingEdit?.newText ?? rawItem?.str ?? '',
         fontSize: existingEdit?.fontSize || (rawItem?.fontSize ?? 16),
-        fontFamily: existingEdit?.fontFamily || (rawItem ? getWebFontMetrics(rawItem?.fontName).fontFamily : 'sans-serif'),
-        fontWeight: existingEdit?.fontWeight || (rawItem?.fontWeight === 'bold' ? 'bold' : (rawItem ? getWebFontMetrics(rawItem?.fontName).fontWeight : 'normal')),
-        fontStyle: existingEdit?.fontStyle || (rawItem?.fontStyle === 'italic' ? 'italic' : (rawItem ? getWebFontMetrics(rawItem?.fontName).fontStyle : 'normal')),
+        fontFamily: existingEdit?.fontFamily || rawItem?.fontFamily || 'sans-serif',
+        fontWeight: existingEdit?.fontWeight || rawItem?.fontWeight || 'normal',
+        fontStyle: existingEdit?.fontStyle || rawItem?.fontStyle || 'normal',
         color: existingEdit?.color || rawItem?.color || '#000000',
         bounds: newBounds,
         originalBounds,
@@ -457,9 +457,9 @@ export default function TextEditLayer({
     }
 
     const exactColor = rawItem.color || '#000000'
-    const { fontFamily, fontWeight: parsedWeight, fontStyle: parsedStyle } = getWebFontMetrics(rawItem?.fontName)
-    const fontWeight = rawItem.fontWeight === 'bold' ? 'bold' : parsedWeight
-    const fontStyle = rawItem.fontStyle === 'italic' ? 'italic' : parsedStyle
+    const fontFamily = rawItem.fontFamily || 'sans-serif'
+    const fontWeight = rawItem.fontWeight || 'normal'
+    const fontStyle = rawItem.fontStyle || 'normal'
     const rawFontSize = rawItem.fontSize
     const pageHeight = rawItem.pageHeight
 
