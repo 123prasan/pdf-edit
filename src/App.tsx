@@ -10,7 +10,7 @@ import {
   IconPlus, IconMinus, IconFile, IconSquare, IconCircle, IconLine
 } from './components/Icons'
 import type { Annotation, ToolType } from './types'
-import { useExtractedText } from './hooks/useExtractedText'
+import { useExtractedText, type ExtractedTextItem } from './hooks/useExtractedText'
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`
@@ -152,6 +152,12 @@ export default function App() {
 
   const { data: extractedItems, embeddedFonts, loading: extractLoading } = useExtractedText(pdfFileObj)
 
+  const [localExtractedItems, setLocalExtractedItems] = useState<Record<number, ExtractedTextItem[]>>({})
+
+  useEffect(() => {
+    setLocalExtractedItems(extractedItems)
+  }, [extractedItems])
+
   // Inject embedded fonts from PDF
   useEffect(() => {
     if (embeddedFonts && Object.keys(embeddedFonts).length > 0) {
@@ -216,7 +222,7 @@ export default function App() {
       link.href = url
       document.head.appendChild(link)
     }
-  }, [extractedItems])
+  }, [localExtractedItems])
 
   // Undo / Redo
   const [history, setHistory] = useState<Annotation[][]>([[]])
@@ -584,15 +590,9 @@ export default function App() {
     setPdfBytes(newBytes)
     pdfBytesRef.current = newBytes
     setNumPages(pdf.numPages)
-    setAnnotations([])
-    setTextEdits([])
-    setHistory([[]])
-    setHistoryIndex(0)
-    setSelectedId(null)
-    // Create a new File object so useExtractedText re-extracts for the new page structure
-    const newFile = new File([newBytes], fileName || 'document.pdf', { type: 'application/pdf' })
-    setPdfFileObj(newFile)
-  }, [fileName])
+    // We intentionally DO NOT clear annotations or setPdfFileObj here so we don't
+    // lose user work or re-trigger the server text extraction.
+  }, [])
 
   const deletePage = useCallback(async (pageNum: number) => {
     if (!pdfBytes || numPages <= 1) {
@@ -604,6 +604,25 @@ export default function App() {
       doc.removePage(pageNum - 1) // 0-indexed
       const saved = await doc.save()
       const newBytes = new Uint8Array(saved)
+
+      // Shift annotations and text edits
+      setAnnotations(prev => prev.filter(a => a.page !== pageNum).map(a => a.page > pageNum ? { ...a, page: a.page - 1 } : a))
+      setTextEdits(prev => prev.filter(e => e.page !== pageNum).map(e => e.page > pageNum ? { ...e, page: e.page - 1 } : e))
+
+      // Shift extracted text
+      setLocalExtractedItems(prev => {
+        const next: Record<number, ExtractedTextItem[]> = {}
+        for (const [key, items] of Object.entries(prev)) {
+          const p = parseInt(key, 10)
+          if (p > pageNum) {
+            next[p - 1] = items.map(item => ({ ...item, page: p - 1 }))
+          } else if (p < pageNum) {
+            next[p] = items
+          }
+        }
+        return next
+      })
+
       if (currentPage > numPages - 1) setCurrentPage(numPages - 1)
       await reloadPdfFromBytes(newBytes)
       showToast(`Deleted page ${pageNum}`)
@@ -622,6 +641,26 @@ export default function App() {
       const { width, height } = refPage.getSize()
       doc.insertPage(beforePageNum - 1, [width, height])
       const saved = await doc.save()
+
+      // Shift annotations and text edits
+      setAnnotations(prev => prev.map(a => a.page >= beforePageNum ? { ...a, page: a.page + 1 } : a))
+      setTextEdits(prev => prev.map(e => e.page >= beforePageNum ? { ...e, page: e.page + 1 } : e))
+
+      // Shift extracted text
+      setLocalExtractedItems(prev => {
+        const next: Record<number, ExtractedTextItem[]> = {}
+        for (const [key, items] of Object.entries(prev)) {
+          const p = parseInt(key, 10)
+          if (p >= beforePageNum) {
+            next[p + 1] = items.map(item => ({ ...item, page: p + 1 }))
+          } else {
+            next[p] = items
+          }
+        }
+        next[beforePageNum] = [] // The inserted blank page has no text
+        return next
+      })
+
       await reloadPdfFromBytes(new Uint8Array(saved))
       showToast(`Inserted blank page before page ${beforePageNum}`)
     } catch (err) {
@@ -951,7 +990,7 @@ export default function App() {
                       setActiveFont={setActiveFont}
                       docFonts={docFonts}
                       docColors={docColors}
-                      extractedItems={extractedItems}
+                      extractedItems={localExtractedItems}
                       annotations={annotations.filter(a => a.page === pageNum)}
                       textEdits={textEdits}
                       selectedId={selectedId}
